@@ -1,0 +1,396 @@
+\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[colorlinks=true,linkcolor=blue,urlcolor=blue]{hyperref}
+\usepackage{enumitem}
+
+\title{Double Simulation Loop in IDAES Grid Integration: An Explainer}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\paragraph{Overview}
+This document explains the IDAES ``double loop'' architecture as a tutorial for a first-time reader who wants both intuition and code-level grounding. The short version is: Prescient runs the simulation clock and market solves, while IDAES logic is injected through plugin callbacks managed by a coordinator. The day-ahead (DA) loop computes bids for unit commitment; the real-time (RT) loop computes bids, tracks dispatch feasibility, and reports delivered power for settlement.
+
+\paragraph{What ``double loop'' means}
+There are two nested operational rhythms:
+\begin{itemize}[leftmargin=*]
+  \item DA loop: forecast uncertainty, build DA bids, run RUC (day-ahead market clearing), store DA prices/dispatch.
+  \item RT loop: build RT bids, run SCED, track dispatch with a process model, report delivered power for settlement calculations.
+\end{itemize}
+
+\paragraph{Who owns the time loop}
+Prescient owns the master loop and invokes callbacks. IDAES does not run the outer loop directly; it reacts through registered callback functions in \texttt{DoubleLoopCoordinator} \hyperref[fn:DoubleLoopCoordinator]{(see Function Note)} and \texttt{register\_plugins} \hyperref[fn:register_plugins]{(see Function Note)}. This is visible from the plugin configuration passed into \texttt{Prescient().simulate(...)} in the example and integration test code.
+
+\paragraph{Main objects in plain language}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Coordinator}: traffic controller between Prescient and IDAES models.
+  \item \textbf{Bidder}: optimization object that turns forecasts and state into market offers.
+  \item \textbf{Tracker}: MPC-style optimizer that makes process-level output track market dispatch.
+  \item \textbf{Forecaster}: source of DA/RT uncertainty scenarios (typically price scenarios).
+\end{itemize}
+
+\section{Big Picture Data Flow}
+\begin{itemize}[leftmargin=*]
+  \item Forecast uncertainty (Forecaster)
+  \item Build bids (Bidder)
+  \item Clear market (Prescient RUC/SCED)
+  \item Retrieve dispatch and prices (Coordinator)
+  \item Track dispatch physically (Tracker)
+  \item Report delivered output for settlement stats (Coordinator)
+  \item Activate next state and repeat
+\end{itemize}
+
+In code terms, this sequence is spread across Prescient callback hooks. The coordinator registers all hooks once, then each hook does one focused job: inject bids before solves, collect outputs after solves, update process model states, and hand delivered power back to Prescient. If you keep that callback mindset, the architecture is much easier to reason about than treating it as one monolithic algorithm.
+
+\section{Day-Ahead Loop Walkthrough (Explanatory)}
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Plugin registration happens once.} Prescient calls \texttt{register\_plugins} \hyperref[fn:register_plugins]{(see Function Note)}. Why: this declares where DA and RT logic enters the simulator lifecycle.
+
+  Inputs: Prescient plugin context/options. Outputs: callback bindings.
+
+  \item \textbf{Before RUC solve, Prescient invokes DA bid callback.} It calls \texttt{bid\_into\_DAM} \hyperref[fn:bid_into_DAM]{(see Function Note)}. Why: this is the only point to inject DA offers before market clearing.
+
+  Inputs: \texttt{ruc\_instance}, \texttt{ruc\_date}, \texttt{ruc\_hour}. Outputs: staged bids and updated RUC generator data.
+
+  \item \textbf{If this is not day 1, coordinator projects state to next DA boundary.} It runs \texttt{project\_tracking\_trajectory} \hyperref[fn:project_tracking_trajectory]{(see Function Note)} (and internally \texttt{assemble\_project\_tracking\_signal} \hyperref[fn:assemble_project_tracking_signal]{(see Function Note)} and \texttt{\_clone\_tracking\_model} \hyperref[fn:clone_tracking_model]{(see Function Note)}). Why: DA bidding should start from a projected physical state, not stale state.
+
+  Inputs: current tracker state and available dispatch context. Outputs: projected implemented profiles.
+
+  \item \textbf{Bidder updates DA model state.} Coordinator calls \texttt{update\_day\_ahead\_model} \hyperref[fn:update_day_ahead_model]{(see Function Note)} on the bidder. Why: make model internals consistent with projected profiles before optimization.
+
+  Inputs: projected profile dict. Outputs: bidder model state mutation.
+
+  \item \textbf{Bidder computes DA bids.} Coordinator calls \texttt{compute\_day\_ahead\_bids} \hyperref[fn:compute_day_ahead_bids]{(see Function Note)}. Why: produce offer curves from forecast + model constraints.
+
+  Inputs: date/hour, forecaster scenarios via \texttt{forecast\_day\_ahead\_and\_real\_time\_prices} \hyperref[fn:forecast_day_ahead_and_real_time_prices]{(see Function Note)}. Outputs: per-time bid dictionary.
+
+  \item \textbf{Coordinator stages bid state.} In \texttt{bid\_into\_DAM} \hyperref[fn:bid_into_DAM]{(see Function Note)}, it writes \texttt{current\_bids} (first day only) and \texttt{next\_bids}. Why: DA data is computed ahead and then activated later.
+
+  Inputs: bid dict. Outputs: coordinator state mutation.
+
+  \item \textbf{Coordinator maps bids into Prescient format.} It calls \texttt{\_pass\_DA\_bid\_to\_prescient} \hyperref[fn:pass_DA_bid_to_prescient]{(see Function Note)}, which uses \texttt{\_update\_bids} \hyperref[fn:update_bids]{(see Function Note)}. Why: bidder output format and Prescient generator dictionary format are not identical.
+
+  Inputs: bidder bid dict and Prescient generator dict. Outputs: fields like \texttt{p\_cost}, \texttt{p\_max}, \texttt{p\_min} updated in RUC data.
+
+  \item \textbf{Prescient solves RUC.} This solve itself is in Prescient (outside this repository). Why: DA market clearing engine lives in Prescient.
+
+  Inputs: network/system data + injected bids. Outputs: DA prices and DA cleared dispatch.
+
+  \item \textbf{After RUC, coordinator captures prices.} Prescient invokes \texttt{fetch\_DA\_prices} \hyperref[fn:fetch_DA_prices]{(see Function Note)}. Why: RT bidding and state logic need realized DA prices.
+
+  Inputs: RUC result object. Outputs: \texttt{next\_DA\_prices}, \texttt{current\_avail\_DA\_prices}.
+
+  \item \textbf{After RUC, coordinator captures dispatches.} Prescient invokes \texttt{fetch\_DA\_dispatches} \hyperref[fn:fetch_DA_dispatches]{(see Function Note)}. Why: RT coupling uses realized DA dispatch commitments.
+
+  Inputs: RUC result object. Outputs: \texttt{next\_DA\_dispatches}, \texttt{current\_avail\_DA\_dispatches}.
+
+  \item \textbf{After RUC, forecaster receives DA market stats.} Prescient invokes \texttt{push\_day\_ahead\_stats\_to\_forecaster} \hyperref[fn:push_day_ahead_stats_to_forecaster]{(see Function Note)}. Why: forecaster can adapt historical/statistical state.
+
+  Inputs: DA result object. Outputs: forecaster-internal historical updates (implementation dependent).
+
+  \item \textbf{After RUC activation, pending DA becomes current DA.} Prescient invokes \texttt{activate\_pending\_DA\_data} \hyperref[fn:activate_pending_DA_data]{(see Function Note)}. Why: separate ``computed next day'' from ``currently active day''.
+
+  Inputs: staged \texttt{next\_*}. Outputs: \texttt{current\_*} promoted and \texttt{next\_*} reset to \texttt{None}.
+\end{enumerate}
+
+\section{Real-Time Loop Walkthrough (Explanatory)}
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Before SCED solve, Prescient invokes RT bid callback.} It calls \texttt{bid\_into\_RTM} \hyperref[fn:bid_into_RTM]{(see Function Note)}. Why: inject RT offers right before operations solve.
+
+  Inputs: \texttt{sced\_instance}, current simulation time. Outputs: updated SCED generator bid fields.
+
+  \item \textbf{Bidder computes RT bids with DA context.} Coordinator calls \texttt{compute\_real\_time\_bids} \hyperref[fn:compute_real_time_bids]{(see Function Note)}. Why: RT offers depend on both RT forecasts and already-realized DA commitments.
+
+  Inputs: \texttt{current\_avail\_DA\_prices}, \texttt{current\_avail\_DA\_dispatches}, RT forecasts. Outputs: RT bid dict.
+
+  \item \textbf{Bidder injects realized DA constraints into RT model.} Inside RT bid computation, bidder uses \texttt{\_pass\_realized\_day\_ahead\_dispatches} \hyperref[fn:pass_realized_day_ahead_dispatches]{(see Function Note)} and \texttt{\_pass\_realized\_day\_ahead\_prices} \hyperref[fn:pass_realized_day_ahead_prices]{(see Function Note)}. Why: enforce consistency with DA where data exists, and forecast/fallback where horizon extends beyond available DA values.
+
+  Inputs: realized DA arrays and hour index. Outputs: RT model variable fixing/unfixing and parameter updates.
+
+  \item \textbf{Coordinator maps RT bids into Prescient schema.} It calls \texttt{\_pass\_RT\_bid\_to\_prescient} \hyperref[fn:pass_RT_bid_to_prescient]{(see Function Note)}. Why: same format-translation reason as DA.
+
+  Inputs: RT bids + SCED instance data dict. Outputs: SCED generator fields updated.
+
+  \item \textbf{Prescient solves SCED.} The internal solve and dispatch mechanics are in Prescient. Why: operations market solver is external to this package.
+
+  Not clear from local code how Prescient orders all internal substeps; this requires runtime inspection in Prescient internals.
+
+  \item \textbf{After operations solve, coordinator builds tracking signal.} Prescient calls \texttt{track\_sced\_signal} \hyperref[fn:track_sced_signal]{(see Function Note)}; this calls \texttt{assemble\_sced\_tracking\_market\_signals} \hyperref[fn:assemble_sced_tracking_market_signals]{(see Function Note)}. Why: tracker needs one short trajectory, not just one scalar dispatch.
+
+  Inputs: SCED dispatch \texttt{pg} values and DA look-ahead values. Outputs: list \texttt{market\_signals}.
+
+  \item \textbf{Tracker solves dispatch-following MPC.} Coordinator calls \texttt{track\_market\_dispatch} \hyperref[fn:track_market_dispatch]{(see Function Note)}. Why: enforce process feasibility and quantify under/over-delivery penalties.
+
+  Inputs: market signal trajectory. Outputs: implemented profile dict and updated tracker internals (including \texttt{daily\_stats}).
+
+  \item \textbf{Coordinator advances internal models with implemented profiles.} It calls tracker \texttt{update\_model} \hyperref[fn:tracker_update_model]{(see Function Note)} and bidder \texttt{update\_real\_time\_model} \hyperref[fn:update_real_time_model]{(see Function Note)}. Why: next RT step should begin from actual implemented state, not planned state.
+
+  Inputs: implemented profiles from tracker. Outputs: model state updates.
+
+  \item \textbf{Delivered power is written back for settlement/stats path.} Prescient calls \texttt{update\_observed\_dispatch} \hyperref[fn:update_observed_dispatch]{(see Function Note)}. Why: settlement/statistics should use delivered power from tracker, not merely requested dispatch.
+
+  Inputs: \texttt{ops\_stats} dicts and tracker last delivered power via \texttt{get\_last\_delivered\_power} \hyperref[fn:get_last_delivered_power]{(see Function Note)}. Outputs: observed dispatch dictionaries overwritten at generator key.
+
+  \item \textbf{Hourly forecaster stats update also occurs.} Prescient invokes \texttt{push\_hourly\_stats\_to\_forecaster} \hyperref[fn:push_hourly_stats_to_forecaster]{(see Function Note)}. Why: keep forecast data source synchronized with latest realized market stats.
+\end{enumerate}
+
+\section{State Variables You Must Understand}
+\paragraph{\texttt{current\_*} vs \texttt{next\_*}}
+The coordinator explicitly separates staged DA information from active DA information. During DA callbacks, it computes and stores \texttt{next\_bids}, \texttt{next\_DA\_prices}, and \texttt{next\_DA\_dispatches}. Later, \texttt{activate\_pending\_DA\_data} \hyperref[fn:activate_pending_DA_data]{(see Function Note)} promotes those values into \texttt{current\_*}. This avoids accidental use of ``tomorrow'' values in ``today'' logic.
+
+\paragraph{Activation behavior}
+Activation is a synchronized state transition: \texttt{current = next} and \texttt{next = None}, then ``available'' arrays are aligned to current DA arrays. This is the key day boundary transition in coordinator state.
+
+\paragraph{What persists across hours/days}
+\begin{itemize}[leftmargin=*]
+  \item Tracker model state and \texttt{daily\_stats} persist and roll forward.
+  \item Bidder model state persists and is updated from implemented profiles.
+  \item Forecaster historical structures may persist/update depending on concrete forecaster class.
+  \item Coordinator stores active/staged DA arrays and bids.
+\end{itemize}
+
+\paragraph{Why projection appears before DA bidding}
+On non-first day DA bidding, coordinator runs \texttt{project\_tracking\_trajectory} \hyperref[fn:project_tracking_trajectory]{(see Function Note)}. Intuition: DA bid optimization should start from where the physical system is expected to be at the next DA boundary, not where it was at the previous callback. This reduces state mismatch between process model and market timeline.
+
+\section{Where to Plug In DC and ASU}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Put DA/RT bidding logic in a bidder class.} Integrate DC/ASU economics and bidding policy behind \texttt{compute\_day\_ahead\_bids} \hyperref[fn:compute_day_ahead_bids]{(see Function Note)} and \texttt{compute\_real\_time\_bids} \hyperref[fn:compute_real_time_bids]{(see Function Note)}.
+
+  \item \textbf{Enforce physical feasibility primarily in tracker.} For complex dynamic feasibility (inventory/ramp/process coupling), implement it in the tracking model used by \texttt{track\_market\_dispatch} \hyperref[fn:track_market_dispatch]{(see Function Note)}. If hard feasibility must also constrain offers, mirror key constraints in bidder formulation.
+
+  \item \textbf{Update backlog/inventory dynamics in model update paths.} Use tracker \texttt{update\_model} \hyperref[fn:tracker_update_model]{(see Function Note)} and bidder \texttt{update\_real\_time\_model} \hyperref[fn:update_real_time_model]{(see Function Note)} / \texttt{update\_day\_ahead\_model} \hyperref[fn:update_day_ahead_model]{(see Function Note)} to carry intertemporal DC/ASU state.
+
+  \item \textbf{Match Prescient bid schema exactly.} Your bidder output must be compatible with coordinator mapping in \texttt{\_update\_bids} \hyperref[fn:update_bids]{(see Function Note)} and pass-through calls \texttt{\_pass\_DA\_bid\_to\_prescient} \hyperref[fn:pass_DA_bid_to_prescient]{(see Function Note)} / \texttt{\_pass\_RT\_bid\_to\_prescient} \hyperref[fn:pass_RT_bid_to_prescient]{(see Function Note)}.
+
+  \item \textbf{Settlement linkage depends on delivered power writeback.} Ensure tracker exposes correct delivered power through \texttt{get\_last\_delivered\_power} \hyperref[fn:get_last_delivered_power]{(see Function Note)} because \texttt{update\_observed\_dispatch} \hyperref[fn:update_observed_dispatch]{(see Function Note)} is where Prescient receives it.
+\end{itemize}
+
+\appendix
+\section{Appendix A --- Function Notes (Hyperlinked)}
+
+\subsection{DoubleLoopCoordinator}\label{fn:DoubleLoopCoordinator}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{class DoubleLoopCoordinator:} (around line 30)
+\paragraph{Call context} Created in plugin module, then used by Prescient plugin system.
+\paragraph{What it does} Central orchestrator between Prescient callbacks and IDAES objects (bidder, tracker, projection tracker).
+\paragraph{Inputs/Outputs} Inputs are bidder/tracker objects in constructor; outputs are callback methods and plugin module adapter.
+\paragraph{Important state} Holds \texttt{current\_*}/\texttt{next\_*} DA state and object references.
+
+\subsection{register\_plugins}\label{fn:register_plugins}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def register\_plugins(self, context, options, plugin\_config):} (line 58)
+\paragraph{Call context} Called by Prescient during plugin initialization.
+\paragraph{What it does} Registers all lifecycle callbacks for DA/RT integration.
+\paragraph{Inputs/Outputs} Input: Prescient registration context and options. Output: callback hooks bound to coordinator methods.
+\paragraph{State mutation} Sets \texttt{self.plugin\_config}.
+
+\subsection{prescient\_plugin\_module}\label{fn:prescient_plugin_module}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{@property def prescient\_plugin\_module(self):} (line 126)
+\paragraph{Call context} Used when passing in-memory plugin module object into Prescient options.
+\paragraph{What it does} Wraps \texttt{get\_configuration} and \texttt{register\_plugins} in a module-like object Prescient accepts.
+
+\subsection{bid\_into\_DAM}\label{fn:bid_into_DAM}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def bid\_into\_DAM(self, options, simulator, ruc\_instance, ruc\_date, ruc\_hour):} (line 468)
+\paragraph{Call context} Called by Prescient callback before RUC solve.
+\paragraph{What it does} Optional projection update, DA bid computation, staging bid state, and DA bid injection to Prescient.
+\paragraph{Inputs/Outputs} Inputs: RUC instance, date/hour, simulator state. Output: RUC generator dict updated via downstream calls.
+\paragraph{State mutation} \texttt{current\_bids} (first day), \texttt{next\_bids}.
+\paragraph{Expects} Bidder implements DA compute and model update interfaces.
+
+\subsection{project\_tracking\_trajectory}\label{fn:project_tracking_trajectory}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def project\_tracking\_trajectory(self, options, simulator, ruc\_hour):} (line 321)
+\paragraph{Call context} Called inside \texttt{bid\_into\_DAM} on non-first day.
+\paragraph{What it does} Runs projection tracker across remaining day hours to estimate trajectory used for DA model advancement.
+\paragraph{Inputs/Outputs} Inputs: simulator time and ruc hour. Output: merged projected profile dict.
+\paragraph{State mutation} Uses and resets \texttt{projection\_tracker.daily\_stats}.
+
+\subsection{assemble\_project\_tracking\_signal}\label{fn:assemble_project_tracking_signal}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def assemble\_project\_tracking\_signal(self, options, simulator, hour):} (line 296)
+\paragraph{Call context} Internal helper for projection loop.
+\paragraph{What it does} Builds projection market signal list for tracker horizon from DA context.
+
+\subsection{\_clone\_tracking\_model}\label{fn:clone_tracking_model}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def \_clone\_tracking\_model(self):} (line 366)
+\paragraph{Call context} Called before projection trajectory loop.
+\paragraph{What it does} Copies Var/Param values from tracker model to projection tracker model.
+\paragraph{State mutation} Projection tracker model variables/parameters updated.
+
+\subsection{compute\_day\_ahead\_bids}\label{fn:compute_day_ahead_bids}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/bidder.py}
+\paragraph{Signature} \texttt{def compute\_day\_ahead\_bids(self, date, hour=0):} (line 508)
+\paragraph{Call context} Called by coordinator during DA callback.
+\paragraph{What it does} Requests DA/RT forecasts, solves DA bidding optimization, records bids, returns full bid dict.
+\paragraph{Inputs/Outputs} Inputs: date/hour, forecaster outputs. Output: bids indexed by time and generator.
+\paragraph{State mutation} Bidder result buffers and underlying model result records.
+
+\subsection{forecast\_day\_ahead\_and\_real\_time\_prices}\label{fn:forecast_day_ahead_and_real_time_prices}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/forecaster.py}
+\paragraph{Signature} \texttt{def forecast\_day\_ahead\_and\_real\_time\_prices(...):} (abstract at line 32; concrete implementations such as line 170 and 485)
+\paragraph{Call context} Called by bidder DA computation.
+\paragraph{What it does} Returns scenario dictionaries for DA and RT prices over horizon.
+\paragraph{Expects} Bus, horizon, and sample count to be valid for selected forecaster.
+
+\subsection{\_pass\_DA\_bid\_to\_prescient}\label{fn:pass_DA_bid_to_prescient}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def \_pass\_DA\_bid\_to\_prescient(self, options, ruc\_instance, bids):} (line 272)
+\paragraph{Call context} Called inside \texttt{bid\_into\_DAM}.
+\paragraph{What it does} Locates generator dict in RUC instance and forwards mapping to \texttt{\_update\_bids}.
+
+\subsection{\_update\_bids}\label{fn:update_bids}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def \_update\_bids(self, gen\_dict, bids, start\_hour, horizon):} (line 187)
+\paragraph{Call context} Used by both DA and RT pass-through methods.
+\paragraph{What it does} Translates bidder bid dictionary into Prescient generator dictionary schema.
+\paragraph{Inputs/Outputs} Inputs: target generator dict and bid dict. Output: in-place updates to Prescient input data.
+\paragraph{State mutation} Mutates \texttt{gen\_dict} fields (e.g., \texttt{p\_cost}, limits, startup/shutdown fields).
+\paragraph{Expects} Bid dict fields compatible with mapping table.
+
+\subsection{fetch\_DA\_prices}\label{fn:fetch_DA_prices}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def fetch\_DA\_prices(self, options, simulator, result, uc\_date, uc\_hour):} (line 512)
+\paragraph{Call context} Called by Prescient callback after RUC generation.
+\paragraph{What it does} Reads DA LMP values from RUC result and stores them as staged/available coordinator state.
+\paragraph{State mutation} \texttt{current\_avail\_DA\_prices}, \texttt{next\_DA\_prices}.
+
+\subsection{fetch\_DA\_dispatches}\label{fn:fetch_DA_dispatches}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def fetch\_DA\_dispatches(self, options, simulator, result, uc\_date, uc\_hour):} (line 545)
+\paragraph{Call context} Called by Prescient callback after RUC generation.
+\paragraph{What it does} Reads DA cleared generation for target unit and stores staged/available state.
+\paragraph{State mutation} \texttt{current\_avail\_DA\_dispatches}, \texttt{next\_DA\_dispatches}.
+
+\subsection{push\_day\_ahead\_stats\_to\_forecaster}\label{fn:push_day_ahead_stats_to_forecaster}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def push\_day\_ahead\_stats\_to\_forecaster(self, options, simulator, day\_ahead\_result, uc\_date, uc\_hour):} (line 161)
+\paragraph{Call context} Called by Prescient callback after RUC generation.
+\paragraph{What it does} Forwards DA result object to forecaster update hook.
+\paragraph{Expects} Forecaster implements \texttt{fetch\_day\_ahead\_stats\_from\_prescient}.
+
+\subsection{activate\_pending\_DA\_data}\label{fn:activate_pending_DA_data}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def activate\_pending\_DA\_data(self, options, simulator):} (line 791)
+\paragraph{Call context} Called by Prescient callback after RUC activation.
+\paragraph{What it does} Promotes all staged DA state into active DA state.
+\paragraph{State mutation} \texttt{current\_bids}, \texttt{current\_DA\_prices}, \texttt{current\_DA\_dispatches}, plus corresponding \texttt{next\_*} resets and \texttt{current\_avail\_*} updates.
+
+\subsection{bid\_into\_RTM}\label{fn:bid_into_RTM}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def bid\_into\_RTM(self, options, simulator, sced\_instance):} (line 616)
+\paragraph{Call context} Called by Prescient callback before operations/SCED solve.
+\paragraph{What it does} Requests RT bids from bidder using realized DA context and injects them into SCED instance.
+\paragraph{State mutation} SCED generator dictionary via downstream call.
+
+\subsection{compute\_real\_time\_bids}\label{fn:compute_real_time_bids}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/bidder.py}
+\paragraph{Signature} \texttt{def compute\_real\_time\_bids(self, date, hour, realized\_day\_ahead\_prices, realized\_day\_ahead\_dispatches):} (line 545)
+\paragraph{Call context} Called by coordinator in RT pre-solve callback.
+\paragraph{What it does} Builds RT forecasts, injects realized DA info into RT model, solves RT bid problem, records bids.
+\paragraph{Inputs/Outputs} Inputs: current date/hour and realized DA vectors. Output: RT full bid dict.
+
+\subsection{\_pass\_realized\_day\_ahead\_prices}\label{fn:pass_realized_day_ahead_prices}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/bidder.py}
+\paragraph{Signature} \texttt{def \_pass\_realized\_day\_ahead\_prices(self, realized\_day\_ahead\_prices, date, hour):} (line 584)
+\paragraph{Call context} Internal helper during RT bid computation.
+\paragraph{What it does} Fills RT model DA price parameters from realized values; falls back to forecast when horizon extends beyond available realized data.
+\paragraph{State mutation} Mutates per-scenario \texttt{day\_ahead\_energy\_price} parameters.
+
+\subsection{\_pass\_realized\_day\_ahead\_dispatches}\label{fn:pass_realized_day_ahead_dispatches}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/bidder.py}
+\paragraph{Signature} \texttt{def \_pass\_realized\_day\_ahead\_dispatches(self, realized\_day\_ahead\_dispatches, hour):} (line 622)
+\paragraph{Call context} Internal helper during RT bid computation.
+\paragraph{What it does} Fixes/unfixes DA power variables and underbid slack variables according to availability of realized DA dispatch values.
+\paragraph{State mutation} Mutates RT model variable fixed statuses and values.
+
+\subsection{\_pass\_RT\_bid\_to\_prescient}\label{fn:pass_RT_bid_to_prescient}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def \_pass\_RT\_bid\_to\_prescient(self, options, simulator, sced\_instance, bids, hour):} (line 587)
+\paragraph{Call context} Called by \texttt{bid\_into\_RTM}.
+\paragraph{What it does} Writes RT bid information into SCED generator dictionary through \texttt{\_update\_bids}.
+
+\subsection{track\_sced\_signal}\label{fn:track_sced_signal}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def track\_sced\_signal(self, options, simulator, sced\_instance, lmp\_sced):} (line 718)
+\paragraph{Call context} Called by Prescient callback after operations solve.
+\paragraph{What it does} Assembles tracking signals, solves tracker, then updates tracker and bidder models with implemented profiles.
+\paragraph{State mutation} Indirectly mutates tracker and bidder internal model states.
+
+\subsection{assemble\_sced\_tracking\_market\_signals}\label{fn:assemble_sced_tracking_market_signals}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def assemble\_sced\_tracking\_market\_signals(self, options, simulator, sced\_instance, hour):} (line 648)
+\paragraph{Call context} Called by \texttt{track\_sced\_signal}.
+\paragraph{What it does} Reads SCED dispatch and combines with DA look-ahead into one list for tracker.
+
+\subsection{track\_market\_dispatch}\label{fn:track_market_dispatch}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/tracker.py}
+\paragraph{Signature} \texttt{def track\_market\_dispatch(self, market\_dispatch, date, hour):} (line 283)
+\paragraph{Call context} Called by coordinator after SCED callback and by projection logic.
+\paragraph{What it does} Loads dispatch parameters, solves tracking optimization, records results, extracts implemented profile, updates daily rolling stats.
+\paragraph{Inputs/Outputs} Input: dispatch list and time stamp. Output: implemented profile dictionary.
+\paragraph{State mutation} Tracker model params/constraints, \texttt{result\_list}, \texttt{daily\_stats}.
+
+\subsection{update\_model (Tracker)}\label{fn:tracker_update_model}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/tracker.py}
+\paragraph{Signature} \texttt{def update\_model(self, **profiles):} (line 270)
+\paragraph{Call context} Called by coordinator after tracking solve.
+\paragraph{What it does} Pushes implemented profiles into tracking model object state.
+
+\subsection{update\_real\_time\_model}\label{fn:update_real_time_model}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/bidder.py}
+\paragraph{Signature} \texttt{def update\_real\_time\_model(self, **kwargs):} (line 662)
+\paragraph{Call context} Called by coordinator after tracking solve.
+\paragraph{What it does} Updates all RT bidding scenario blocks using implemented profile data.
+
+\subsection{update\_day\_ahead\_model}\label{fn:update_day_ahead_model}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/bidder.py}
+\paragraph{Signature} \texttt{def update\_day\_ahead\_model(self, **kwargs):} (line 649)
+\paragraph{Call context} Called by coordinator before DA bid solve on non-first day.
+\paragraph{What it does} Advances DA bidding scenario blocks with projected/implemented profiles.
+
+\subsection{update\_observed\_dispatch}\label{fn:update_observed_dispatch}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def update\_observed\_dispatch(self, options, simulator, ops\_stats):} (line 759)
+\paragraph{Call context} Called by Prescient update-operations-stats callback.
+\paragraph{What it does} Writes tracker-delivered power into Prescient observed dispatch dictionaries.
+\paragraph{Inputs/Outputs} Input: ops stats object and generator name. Output: mutated observed dispatch dictionaries.
+\paragraph{State mutation} \texttt{ops\_stats.observed\_thermal\_dispatch\_levels}, \texttt{ops\_stats.observed\_renewables\_levels}, \texttt{ops\_stats.observed\_virtual\_dispatch\_levels} at generator key.
+
+\subsection{get\_last\_delivered\_power}\label{fn:get_last_delivered_power}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/tracker.py}
+\paragraph{Signature} \texttt{def get\_last\_delivered\_power(self):} (line 361)
+\paragraph{Call context} Used by coordinator settlement/statistics update path.
+\paragraph{What it does} Returns delivered power at the most recent implemented time step from tracker model object.
+
+\subsection{push\_hourly\_stats\_to\_forecaster}\label{fn:push_hourly_stats_to_forecaster}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def push\_hourly\_stats\_to\_forecaster(self, prescient\_hourly\_stats):} (line 147)
+\paragraph{Call context} Called by hourly-stats callback.
+\paragraph{What it does} Forwards hourly Prescient stats to forecaster ingestion API.
+
+\subsection{write\_plugin\_results}\label{fn:write_plugin_results}
+\paragraph{File path} \texttt{idaes/apps/grid\_integration/coordinator.py}
+\paragraph{Signature} \texttt{def write\_plugin\_results(self, options, simulator):} (line 816)
+\paragraph{Call context} Called at Prescient finalization.
+\paragraph{What it does} Delegates result writing to bidder and tracker objects.
+
+\section{If you only remember 10 things}
+\begin{itemize}[leftmargin=*]
+  \item Prescient drives the outer simulation clock and solves; IDAES logic is callback-based.
+  \item \texttt{DoubleLoopCoordinator} centralizes integration control.
+  \item DA and RT are separate callback phases with different objectives.
+  \item DA path computes and injects offers before RUC.
+  \item RT path computes and injects offers before SCED.
+  \item Tracker is the physical-feasibility bridge between dispatch request and delivered power.
+  \item Settlement linkage depends on writing delivered power into Prescient observed dispatch stats.
+  \item \texttt{next\_*} is staged state; \texttt{current\_*} is active state.
+  \item Activation callback is the explicit day-boundary state transition.
+  \item Extension fragility is highest at data-contract boundaries (bid schema mapping and callback sequencing assumptions).
+\end{itemize}
+
+\end{document}

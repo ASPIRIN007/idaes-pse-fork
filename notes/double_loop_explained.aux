@@ -1,0 +1,229 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\@writefile{toc}{\contentsline {paragraph}{Overview}{1}{section*.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What ``double loop'' means}{1}{section*.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Who owns the time loop}{1}{section*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Main objects in plain language}{1}{section*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1}Big Picture Data Flow}{1}{section.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}Day-Ahead Loop Walkthrough (Explanatory)}{2}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Real-Time Loop Walkthrough (Explanatory)}{3}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}State Variables You Must Understand}{3}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{\texttt  {current\_*} vs \texttt  {next\_*}}{3}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Activation behavior}{4}{section*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What persists across hours/days}{4}{section*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Why projection appears before DA bidding}{4}{section*.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Where to Plug In DC and ASU}{4}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {A}Appendix A --- Function Notes (Hyperlinked)}{4}{appendix.A}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.1}DoubleLoopCoordinator}{4}{subsection.A.1}\protected@file@percent }
+\newlabel{fn:DoubleLoopCoordinator}{{A.1}{4}{DoubleLoopCoordinator}{subsection.A.1}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{4}{section*.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{4}{section*.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{4}{section*.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{4}{section*.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Inputs/Outputs}{4}{section*.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Important state}{5}{section*.14}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.2}register\_plugins}{5}{subsection.A.2}\protected@file@percent }
+\newlabel{fn:register_plugins}{{A.2}{5}{register\_plugins}{subsection.A.2}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{5}{section*.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{5}{section*.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{5}{section*.17}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{5}{section*.18}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Inputs/Outputs}{5}{section*.19}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{State mutation}{5}{section*.20}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.3}prescient\_plugin\_module}{5}{subsection.A.3}\protected@file@percent }
+\newlabel{fn:prescient_plugin_module}{{A.3}{5}{prescient\_plugin\_module}{subsection.A.3}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{5}{section*.21}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{5}{section*.22}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{5}{section*.23}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{5}{section*.24}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.4}bid\_into\_DAM}{5}{subsection.A.4}\protected@file@percent }
+\newlabel{fn:bid_into_DAM}{{A.4}{5}{bid\_into\_DAM}{subsection.A.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{5}{section*.25}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{5}{section*.26}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{5}{section*.27}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{5}{section*.28}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Inputs/Outputs}{5}{section*.29}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{State mutation}{5}{section*.30}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Expects}{5}{section*.31}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.5}project\_tracking\_trajectory}{5}{subsection.A.5}\protected@file@percent }
+\newlabel{fn:project_tracking_trajectory}{{A.5}{5}{project\_tracking\_trajectory}{subsection.A.5}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{5}{section*.32}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{5}{section*.33}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{6}{section*.34}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{6}{section*.35}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Inputs/Outputs}{6}{section*.36}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{State mutation}{6}{section*.37}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.6}assemble\_project\_tracking\_signal}{6}{subsection.A.6}\protected@file@percent }
+\newlabel{fn:assemble_project_tracking_signal}{{A.6}{6}{assemble\_project\_tracking\_signal}{subsection.A.6}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{6}{section*.38}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{6}{section*.39}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{6}{section*.40}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{6}{section*.41}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.7}\_clone\_tracking\_model}{6}{subsection.A.7}\protected@file@percent }
+\newlabel{fn:clone_tracking_model}{{A.7}{6}{\_clone\_tracking\_model}{subsection.A.7}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{6}{section*.42}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{6}{section*.43}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{6}{section*.44}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{6}{section*.45}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{State mutation}{6}{section*.46}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.8}compute\_day\_ahead\_bids}{6}{subsection.A.8}\protected@file@percent }
+\newlabel{fn:compute_day_ahead_bids}{{A.8}{6}{compute\_day\_ahead\_bids}{subsection.A.8}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{6}{section*.47}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{6}{section*.48}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{6}{section*.49}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{6}{section*.50}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Inputs/Outputs}{6}{section*.51}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{State mutation}{6}{section*.52}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.9}forecast\_day\_ahead\_and\_real\_time\_prices}{6}{subsection.A.9}\protected@file@percent }
+\newlabel{fn:forecast_day_ahead_and_real_time_prices}{{A.9}{6}{forecast\_day\_ahead\_and\_real\_time\_prices}{subsection.A.9}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{6}{section*.53}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{6}{section*.54}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{7}{section*.55}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{7}{section*.56}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Expects}{7}{section*.57}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.10}\_pass\_DA\_bid\_to\_prescient}{7}{subsection.A.10}\protected@file@percent }
+\newlabel{fn:pass_DA_bid_to_prescient}{{A.10}{7}{\_pass\_DA\_bid\_to\_prescient}{subsection.A.10}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{7}{section*.58}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{7}{section*.59}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{7}{section*.60}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{7}{section*.61}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.11}\_update\_bids}{7}{subsection.A.11}\protected@file@percent }
+\newlabel{fn:update_bids}{{A.11}{7}{\_update\_bids}{subsection.A.11}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{7}{section*.62}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{7}{section*.63}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{7}{section*.64}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{7}{section*.65}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Inputs/Outputs}{7}{section*.66}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{State mutation}{7}{section*.67}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Expects}{7}{section*.68}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.12}fetch\_DA\_prices}{7}{subsection.A.12}\protected@file@percent }
+\newlabel{fn:fetch_DA_prices}{{A.12}{7}{fetch\_DA\_prices}{subsection.A.12}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{7}{section*.69}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{7}{section*.70}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{7}{section*.71}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{7}{section*.72}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{State mutation}{7}{section*.73}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.13}fetch\_DA\_dispatches}{7}{subsection.A.13}\protected@file@percent }
+\newlabel{fn:fetch_DA_dispatches}{{A.13}{7}{fetch\_DA\_dispatches}{subsection.A.13}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{7}{section*.74}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{7}{section*.75}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{8}{section*.76}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{8}{section*.77}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{State mutation}{8}{section*.78}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.14}push\_day\_ahead\_stats\_to\_forecaster}{8}{subsection.A.14}\protected@file@percent }
+\newlabel{fn:push_day_ahead_stats_to_forecaster}{{A.14}{8}{push\_day\_ahead\_stats\_to\_forecaster}{subsection.A.14}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{8}{section*.79}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{8}{section*.80}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{8}{section*.81}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{8}{section*.82}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Expects}{8}{section*.83}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.15}activate\_pending\_DA\_data}{8}{subsection.A.15}\protected@file@percent }
+\newlabel{fn:activate_pending_DA_data}{{A.15}{8}{activate\_pending\_DA\_data}{subsection.A.15}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{8}{section*.84}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{8}{section*.85}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{8}{section*.86}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{8}{section*.87}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{State mutation}{8}{section*.88}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.16}bid\_into\_RTM}{8}{subsection.A.16}\protected@file@percent }
+\newlabel{fn:bid_into_RTM}{{A.16}{8}{bid\_into\_RTM}{subsection.A.16}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{8}{section*.89}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{8}{section*.90}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{8}{section*.91}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{8}{section*.92}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{State mutation}{8}{section*.93}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.17}compute\_real\_time\_bids}{8}{subsection.A.17}\protected@file@percent }
+\newlabel{fn:compute_real_time_bids}{{A.17}{8}{compute\_real\_time\_bids}{subsection.A.17}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{8}{section*.94}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{8}{section*.95}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{9}{section*.96}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{9}{section*.97}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Inputs/Outputs}{9}{section*.98}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.18}\_pass\_realized\_day\_ahead\_prices}{9}{subsection.A.18}\protected@file@percent }
+\newlabel{fn:pass_realized_day_ahead_prices}{{A.18}{9}{\_pass\_realized\_day\_ahead\_prices}{subsection.A.18}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{9}{section*.99}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{9}{section*.100}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{9}{section*.101}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{9}{section*.102}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{State mutation}{9}{section*.103}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.19}\_pass\_realized\_day\_ahead\_dispatches}{9}{subsection.A.19}\protected@file@percent }
+\newlabel{fn:pass_realized_day_ahead_dispatches}{{A.19}{9}{\_pass\_realized\_day\_ahead\_dispatches}{subsection.A.19}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{9}{section*.104}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{9}{section*.105}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{9}{section*.106}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{9}{section*.107}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{State mutation}{9}{section*.108}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.20}\_pass\_RT\_bid\_to\_prescient}{9}{subsection.A.20}\protected@file@percent }
+\newlabel{fn:pass_RT_bid_to_prescient}{{A.20}{9}{\_pass\_RT\_bid\_to\_prescient}{subsection.A.20}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{9}{section*.109}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{9}{section*.110}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{9}{section*.111}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{9}{section*.112}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.21}track\_sced\_signal}{9}{subsection.A.21}\protected@file@percent }
+\newlabel{fn:track_sced_signal}{{A.21}{9}{track\_sced\_signal}{subsection.A.21}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{9}{section*.113}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{9}{section*.114}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{10}{section*.115}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{10}{section*.116}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{State mutation}{10}{section*.117}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.22}assemble\_sced\_tracking\_market\_signals}{10}{subsection.A.22}\protected@file@percent }
+\newlabel{fn:assemble_sced_tracking_market_signals}{{A.22}{10}{assemble\_sced\_tracking\_market\_signals}{subsection.A.22}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{10}{section*.118}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{10}{section*.119}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{10}{section*.120}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{10}{section*.121}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.23}track\_market\_dispatch}{10}{subsection.A.23}\protected@file@percent }
+\newlabel{fn:track_market_dispatch}{{A.23}{10}{track\_market\_dispatch}{subsection.A.23}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{10}{section*.122}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{10}{section*.123}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{10}{section*.124}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{10}{section*.125}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Inputs/Outputs}{10}{section*.126}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{State mutation}{10}{section*.127}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.24}update\_model (Tracker)}{10}{subsection.A.24}\protected@file@percent }
+\newlabel{fn:tracker_update_model}{{A.24}{10}{update\_model (Tracker)}{subsection.A.24}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{10}{section*.128}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{10}{section*.129}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{10}{section*.130}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{10}{section*.131}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.25}update\_real\_time\_model}{10}{subsection.A.25}\protected@file@percent }
+\newlabel{fn:update_real_time_model}{{A.25}{10}{update\_real\_time\_model}{subsection.A.25}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{10}{section*.132}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{10}{section*.133}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{10}{section*.134}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{10}{section*.135}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.26}update\_day\_ahead\_model}{11}{subsection.A.26}\protected@file@percent }
+\newlabel{fn:update_day_ahead_model}{{A.26}{11}{update\_day\_ahead\_model}{subsection.A.26}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{11}{section*.136}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{11}{section*.137}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{11}{section*.138}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{11}{section*.139}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.27}update\_observed\_dispatch}{11}{subsection.A.27}\protected@file@percent }
+\newlabel{fn:update_observed_dispatch}{{A.27}{11}{update\_observed\_dispatch}{subsection.A.27}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{11}{section*.140}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{11}{section*.141}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{11}{section*.142}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{11}{section*.143}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Inputs/Outputs}{11}{section*.144}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{State mutation}{11}{section*.145}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.28}get\_last\_delivered\_power}{11}{subsection.A.28}\protected@file@percent }
+\newlabel{fn:get_last_delivered_power}{{A.28}{11}{get\_last\_delivered\_power}{subsection.A.28}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{11}{section*.146}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{11}{section*.147}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{11}{section*.148}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{11}{section*.149}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.29}push\_hourly\_stats\_to\_forecaster}{11}{subsection.A.29}\protected@file@percent }
+\newlabel{fn:push_hourly_stats_to_forecaster}{{A.29}{11}{push\_hourly\_stats\_to\_forecaster}{subsection.A.29}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{11}{section*.150}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{11}{section*.151}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{11}{section*.152}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{11}{section*.153}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {A.30}write\_plugin\_results}{11}{subsection.A.30}\protected@file@percent }
+\newlabel{fn:write_plugin_results}{{A.30}{11}{write\_plugin\_results}{subsection.A.30}{}}
+\@writefile{toc}{\contentsline {paragraph}{File path}{11}{section*.154}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Signature}{11}{section*.155}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Call context}{12}{section*.156}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What it does}{12}{section*.157}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {B}If you only remember 10 things}{12}{appendix.B}\protected@file@percent }
+\gdef \@abspage@last{12}
