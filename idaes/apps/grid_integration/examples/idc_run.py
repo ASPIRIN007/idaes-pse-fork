@@ -21,8 +21,10 @@ This script is intentionally small:
 
 from importlib import resources
 from pathlib import Path
-import tempfile
 import sys
+import subprocess
+from datetime import datetime
+import os
 
 # If run as a plain script (`python idc_run.py`), ensure repo root is on sys.path
 # so `import idaes...` resolves.
@@ -55,8 +57,10 @@ def run_idc_demo(num_days=1):
     ) as p:
         plugin_path = str(Path(p))
 
-    # Use temp output directory for quick demos.
-    output_directory = tempfile.mkdtemp(prefix="idc_doubleloop_")
+    # Use persistent output directory in repo so results are easy to find.
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_directory = str(repo_root / "demo_outputs" / f"idc_{timestamp}")
+    Path(output_directory).mkdir(parents=True, exist_ok=True)
 
     # Prescient simulation options; mirrors thermal example defaults.
     options = {
@@ -90,6 +94,19 @@ def run_idc_demo(num_days=1):
 
     # Execute simulation.
     prescient_simulator.Prescient().simulate(**options)
+
+    # Create human-readable summary and plots in output_directory/idc_summary.
+    summarize_script = repo_root / "scripts" / "summarize_idc_run.py"
+    subprocess.run(
+        [
+            sys.executable,
+            str(summarize_script),
+            output_directory,
+        ],
+        check=True,
+        env={**os.environ, "MPLCONFIGDIR": "/tmp/mpl"},
+    )
+    print(f"IDC summary report: {output_directory}/idc_summary/summary.md")
 
     # Return path for callers (tests/scripts) to inspect.
     return output_directory

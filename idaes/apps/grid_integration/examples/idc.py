@@ -18,8 +18,8 @@ existing Bidder/Tracker/Coordinator classes can use it without core changes.
 
 High-level modeling choice in this version:
 - IDC electrical import is represented by `grid_import[h] >= 0`.
-- Market-facing power is represented by `P_V[h] = -grid_import[h]`.
-  This means the IDC appears as negative injection at the interface.
+- Market-facing power is represented by `P_offer[h] >= 0`, which is interpreted
+  as flexible import reduction (a proxy supply quantity).
 """
 
 from collections import deque
@@ -54,6 +54,10 @@ DEFAULT_IDC_CASE_DATA = {
     "backlog_penalty": 25.0,
     # Exogenous arrivals profile; this default is a flat profile.
     "arrivals": [80.0] * 48,
+    # Minimum fraction of arrivals that must be served every period.
+    "sla_min_service_fraction": 0.90,
+    # Hard cap on backlog growth relative to initial backlog (e.g., 0.20 = +20%).
+    "backlog_growth_limit_fraction": 0.20,
 }
 
 
@@ -143,10 +147,11 @@ class IDCModel:
         self.generator = generator
         self.idc_name = idc_name
 
-        # Copy case data (default or user-provided), then validate.
-        self.idc_case_data = dict(
-            DEFAULT_IDC_CASE_DATA if idc_case_data is None else idc_case_data
-        )
+        # Merge user-provided case data over defaults so newly added keys remain
+        # backward-compatible with older case-data dictionaries.
+        self.idc_case_data = dict(DEFAULT_IDC_CASE_DATA)
+        if idc_case_data is not None:
+            self.idc_case_data.update(idc_case_data)
         self._validate_case_data()
 
         # Merge generator and bus tables so generator -> bus name lookup is easy.
@@ -166,10 +171,14 @@ class IDCModel:
         # Bus name is required by bidder/forecaster interfaces.
         bus_name = merged.loc[generator, "Bus Name"]
 
-        # In this version, market-facing power is negative import:
-        # P_V in [-grid_import_max, -misc_power] (both are <= 0).
-        p_min = -float(self.idc_case_data["grid_import_max"])
-        p_max = -float(self.idc_case_data["misc_power"])
+        # Market-facing proxy power is nonnegative flexibility:
+        # P_offer in [0, grid_import_max - misc_power].
+        # The upper bound corresponds to max reduction from import cap to the
+        # fixed misc-power floor.
+        p_min = 0.0
+        p_max = float(self.idc_case_data["grid_import_max"]) - float(
+            self.idc_case_data["misc_power"]
+        )
 
         # Build model_data object consumed by Bidder/Coordinator.
         self._model_data = IDCModelData(
@@ -202,6 +211,8 @@ class IDCModel:
             "drop_penalty",
             "backlog_penalty",
             "arrivals",
+            "sla_min_service_fraction",
+            "backlog_growth_limit_fraction",
         ]
 
         # Fail fast if any required fields are missing.
@@ -232,11 +243,21 @@ class IDCModel:
         if self.idc_case_data["cooling_cop"] <= 0:
             raise ValueError("idc_case_data['cooling_cop'] must be > 0.")
 
-        # Keep feasible lower bound for P_V range in this formulation.
+        # Keep feasible lower bound for P_offer range in this formulation.
         if self.idc_case_data["grid_import_max"] <= self.idc_case_data["misc_power"]:
             raise ValueError(
                 "idc_case_data['grid_import_max'] must be strictly greater than "
                 "'misc_power'."
+            )
+
+        if not (0 <= self.idc_case_data["sla_min_service_fraction"] <= 1):
+            raise ValueError(
+                "idc_case_data['sla_min_service_fraction'] must be within [0, 1]."
+            )
+
+        if self.idc_case_data["backlog_growth_limit_fraction"] < 0:
+            raise ValueError(
+                "idc_case_data['backlog_growth_limit_fraction'] must be >= 0."
             )
 
     @staticmethod
@@ -307,9 +328,15 @@ class IDCModel:
         b.backlog_penalty = pyo.Param(
             initialize=float(params["backlog_penalty"]), mutable=False
         )
+        b.sla_min_service_fraction = pyo.Param(
+            initialize=float(params["sla_min_service_fraction"]), mutable=False
+        )
+        b.backlog_growth_limit_fraction = pyo.Param(
+            initialize=float(params["backlog_growth_limit_fraction"]), mutable=False
+        )
 
-        # Mutable prior power marker (kept for state continuity style parity).
-        b.pre_P_V = pyo.Param(initialize=-float(params["misc_power"]), mutable=True)
+        # Mutable prior offered power marker (kept for state continuity style parity).
+        b.pre_P_offer = pyo.Param(initialize=0.0, mutable=True)
 
         # Exogenous arrivals by time step.
         b.arrivals = pyo.Param(
@@ -350,12 +377,12 @@ class IDCModel:
             within=pyo.NonNegativeReals,
         )
 
-        # Market-facing virtual power output (negative for import).
-        b.P_V = pyo.Var(
+        # Market-facing offered flexibility power (nonnegative).
+        b.P_offer = pyo.Var(
             b.HOUR,
-            initialize=-float(params["misc_power"]),
-            bounds=(-float(params["grid_import_max"]), 0.0),
-            within=pyo.Reals,
+            initialize=0.0,
+            bounds=(0.0, float(params["grid_import_max"]) - float(params["misc_power"])),
+            within=pyo.NonNegativeReals,
         )
 
         # ----------------------
@@ -374,6 +401,12 @@ class IDCModel:
             return b.service[h] + b.drop[h] <= prev + b.arrivals[h]
 
         b.service_backlog_con = pyo.Constraint(b.HOUR, rule=service_backlog_rule)
+
+        # 2a) SLA: require a minimum served fraction of incoming arrivals.
+        def sla_service_rule(b, h):
+            return b.service[h] >= b.sla_min_service_fraction * b.arrivals[h]
+
+        b.sla_service_con = pyo.Constraint(b.HOUR, rule=sla_service_rule)
 
         # 3) Server upper bound.
         def server_max_rule(b, h):
@@ -416,11 +449,21 @@ class IDCModel:
 
         b.grid_cap_con = pyo.Constraint(b.HOUR, rule=grid_cap_rule)
 
-        # 9) Virtual output mapping for market interface.
-        def virtual_power_rule(b, h):
-            return b.P_V[h] == -b.grid_import[h]
+        # 8a) Hard cap on backlog growth relative to horizon initial backlog.
+        def backlog_growth_cap_rule(b, h):
+            return b.backlog[h] <= (
+                1 + b.backlog_growth_limit_fraction
+            ) * b.initial_backlog
 
-        b.virtual_power_con = pyo.Constraint(b.HOUR, rule=virtual_power_rule)
+        b.backlog_growth_cap_con = pyo.Constraint(
+            b.HOUR, rule=backlog_growth_cap_rule
+        )
+
+        # 9) Offered flexibility equals reduction from import cap.
+        def offered_power_rule(b, h):
+            return b.P_offer[h] == b.grid_import_max - b.grid_import[h]
+
+        b.offered_power_con = pyo.Constraint(b.HOUR, rule=offered_power_rule)
 
         # ----------------
         # Cost expressions
@@ -438,7 +481,7 @@ class IDCModel:
         Roll horizon state after implemented control actions.
         """
         # Save latest implemented market-facing power.
-        b.pre_P_V = round(float(implemented_power_output[-1]), 4)
+        b.pre_P_offer = round(float(implemented_power_output[-1]), 4)
 
         # Update initial backlog for next horizon from implemented trajectory.
         if implemented_backlog is not None and len(implemented_backlog) > 0:
@@ -453,7 +496,7 @@ class IDCModel:
         """
         # Implemented power trace over realized sub-horizon.
         implemented_power_output = deque(
-            [pyo.value(b.P_V[t]) for t in range(last_implemented_time_step + 1)]
+            [pyo.value(b.P_offer[t]) for t in range(last_implemented_time_step + 1)]
         )
         # Implemented backlog trace (used for state roll-forward).
         implemented_backlog = deque(
@@ -469,7 +512,7 @@ class IDCModel:
         """
         Return delivered/implemented market-facing power at last implemented step.
         """
-        return pyo.value(b.P_V[last_implemented_time_step])
+        return pyo.value(b.P_offer[last_implemented_time_step])
 
     def record_results(self, b, date=None, hour=None, **kwargs):
         """
@@ -491,7 +534,9 @@ class IDCModel:
                 "IT Power [MW]": float(round(pyo.value(b.it_power[t]), 4)),
                 "Cooling Power [MW]": float(round(pyo.value(b.cooling_power[t]), 4)),
                 "Grid Import [MW]": float(round(pyo.value(b.grid_import[t]), 4)),
-                "Virtual Output P_V [MW]": float(round(pyo.value(b.P_V[t]), 4)),
+                "Offered Flexibility P_offer [MW]": float(
+                    round(pyo.value(b.P_offer[t]), 4)
+                ),
                 "Penalty Cost [$]": float(round(pyo.value(b.penalty_cost[t]), 4)),
                 "Total Cost [$]": float(round(pyo.value(b.tot_cost[t]), 4)),
             }
@@ -518,7 +563,7 @@ class IDCModel:
         """
         Name of market-facing power variable used by Bidder/Tracker references.
         """
-        return "P_V"
+        return "P_offer"
 
     @property
     def total_cost(self):

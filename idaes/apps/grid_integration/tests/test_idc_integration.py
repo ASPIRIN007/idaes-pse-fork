@@ -13,16 +13,16 @@
 """
 Integration checks for IDC example wiring.
 
-This test file intentionally includes:
+This test file includes:
 - basic object/plugin existence checks
-- a known-failure integration check that documents current Prescient boundary
-  behavior for negative `MinimumPowerOutput`.
+- one end-to-end integration check that verifies output artifacts are produced.
 """
 
 from importlib import resources
 from pathlib import Path
 from numbers import Number
 from typing import Dict, Union
+import os
 
 import pytest
 
@@ -70,7 +70,7 @@ class TestIDCIntegration:
             generator="10_STEAM",
         )
         assert model.model_data.gen_name == "10_STEAM"
-        assert model.power_output == "P_V"
+        assert model.power_output == "P_offer"
 
     @pytest.mark.unit
     def test_idc_plugin_path_exists(self, idc_plugin_path: Path):
@@ -121,17 +121,29 @@ class TestIDCIntegration:
         }
 
     @pytest.mark.integration
-    def test_idc_negative_load_hits_prescient_min_power_limit(
+    def test_idc_run_produces_output_files(
         self, idc_sim_options: PrescientOptions
     ):
         """
-        Document current known boundary condition:
-        Prescient rejects negative MinimumPowerOutput for thermal generator record.
+        Run IDC plugin once and verify expected output files exist.
         """
         prescient_simulator = pytest.importorskip(
             "prescient.simulator",
             reason="Prescient (optional dependency) not available",
         )
 
-        with pytest.raises(ValueError, match="MinimumPowerOutput"):
-            prescient_simulator.Prescient().simulate(**idc_sim_options)
+        prescient_simulator.Prescient().simulate(**idc_sim_options)
+
+        output_dir = idc_sim_options["output_directory"]
+        assert os.path.isdir(output_dir)
+        expected = [
+            "overall_simulation_output.csv",
+            "bidder_detail.csv",
+            "tracker_detail.csv",
+            "bidding_model_detail.csv",
+            "tracking_model_detail.csv",
+            "hourly_summary.csv",
+            "bus_detail.csv",
+        ]
+        for fname in expected:
+            assert os.path.isfile(os.path.join(output_dir, fname))

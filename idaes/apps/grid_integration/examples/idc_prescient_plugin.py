@@ -65,6 +65,8 @@ idc_case_data = {
     "drop_penalty": 150.0,
     "backlog_penalty": 25.0,
     "arrivals": [80.0] * 48,
+    "sla_min_service_fraction": 0.90,
+    "backlog_growth_limit_fraction": 0.20,
 }
 
 # Forecaster supplies DA/RT price trajectories to bidder.
