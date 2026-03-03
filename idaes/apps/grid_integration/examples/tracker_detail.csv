@@ -1,0 +1,5 @@
+Date,Hour,Horizon [hr],Power Dispatch [MW],Power Output [MW],Power Underdelivered [MW],Power Overdelivered [MW]
+2021-07-26,17:00,0,30,30.0,0.0,0.0
+2021-07-26,17:00,1,40,40.0,0.0,0.0
+2021-07-26,17:00,2,50,50.0,0.0,0.0
+2021-07-26,17:00,3,70,70.0,0.0,0.0

@@ -10,6 +10,15 @@
 # All rights reserved.  Please see the files COPYRIGHT.md and LICENSE.md
 # for full copyright and license information.
 #################################################################################
+"""
+Integration checks for IDC example wiring.
+
+This test file intentionally includes:
+- basic object/plugin existence checks
+- a known-failure integration check that documents current Prescient boundary
+  behavior for negative `MinimumPowerOutput`.
+"""
+
 from importlib import resources
 from pathlib import Path
 from numbers import Number
@@ -23,12 +32,16 @@ from idaes.apps.grid_integration.examples.utils import (
     rts_gmlc_generator_dataframe,
 )
 
+# Type alias used for readability in fixture signatures.
 PrescientOptions = Dict[str, Union[str, bool, Number, dict]]
 
 
 class TestIDCIntegration:
     @pytest.fixture
     def idc_plugin_path(self) -> Path:
+        """
+        Resolve IDC plugin module file path from package resources.
+        """
         with resources.as_file(
             resources.files("idaes.apps.grid_integration.examples").joinpath(
                 "idc_prescient_plugin.py"
@@ -38,6 +51,9 @@ class TestIDCIntegration:
 
     @pytest.fixture
     def data_path(self) -> Path:
+        """
+        Resolve bundled Prescient 5bus directory path.
+        """
         with resources.as_file(
             resources.files("idaes.tests.prescient.5bus").joinpath("__init__.py")
         ) as pkg_file:
@@ -45,6 +61,9 @@ class TestIDCIntegration:
 
     @pytest.mark.unit
     def test_idc_model_builds(self):
+        """
+        Build IDC model object and check key interface attributes.
+        """
         model = IDCModel(
             rts_gmlc_generator_dataframe=rts_gmlc_generator_dataframe,
             rts_gmlc_bus_dataframe=rts_gmlc_bus_dataframe,
@@ -55,12 +74,18 @@ class TestIDCIntegration:
 
     @pytest.mark.unit
     def test_idc_plugin_path_exists(self, idc_plugin_path: Path):
+        """
+        Plugin file should exist and be importable by Prescient plugin loader.
+        """
         assert idc_plugin_path.is_file()
 
     @pytest.fixture
     def idc_sim_options(
         self, data_path: Path, idc_plugin_path: Path, tmp_path: Path
     ) -> PrescientOptions:
+        """
+        Build a small one-day Prescient options dict for IDC plugin execution.
+        """
         output_dir = tmp_path / "idc_integration_output"
         output_dir.mkdir()
         return {
@@ -99,6 +124,10 @@ class TestIDCIntegration:
     def test_idc_negative_load_hits_prescient_min_power_limit(
         self, idc_sim_options: PrescientOptions
     ):
+        """
+        Document current known boundary condition:
+        Prescient rejects negative MinimumPowerOutput for thermal generator record.
+        """
         prescient_simulator = pytest.importorskip(
             "prescient.simulator",
             reason="Prescient (optional dependency) not available",

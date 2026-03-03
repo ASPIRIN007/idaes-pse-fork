@@ -10,6 +10,18 @@
 # All rights reserved.  Please see the files COPYRIGHT.md and LICENSE.md
 # for full copyright and license information.
 #################################################################################
+"""
+Prescient plugin wiring for IDC example.
+
+This module follows the same pattern as thermal_generator_prescient_plugin.py:
+1) create forecaster
+2) create solver
+3) create tracking / projection tracking model objects
+4) create bidder model object
+5) create coordinator
+6) expose get_configuration/register_plugins for Prescient
+"""
+
 import pyomo.environ as pyo
 
 from idaes.apps.grid_integration import Bidder
@@ -26,13 +38,21 @@ from idaes.apps.grid_integration.examples.utils import (
     rts_gmlc_generator_dataframe,
 )
 
+# Target Prescient generator key to replace/drive with IDC bidding logic.
 generator = "10_STEAM"
+
+# Horizons match existing thermal example defaults.
 tracking_horizon = 4
 day_ahead_bidding_horizon = 48
 real_time_bidding_horizon = tracking_horizon
+
+# Number of price scenarios in stochastic bidder.
 n_scenario = 10
+
+# Number of hours implemented each tracking solve.
 n_tracking_hour = 1
 
+# IDC case data used for all three model objects below.
 idc_case_data = {
     "initial_backlog": 5.0,
     "n_servers_max": 120.0,
@@ -47,6 +67,7 @@ idc_case_data = {
     "arrivals": [80.0] * 48,
 }
 
+# Forecaster supplies DA/RT price trajectories to bidder.
 forecaster = PlaceHolderForecaster(
     daily_da_price_means=daily_da_price_means,
     daily_rt_price_means=daily_rt_price_means,
@@ -54,8 +75,12 @@ forecaster = PlaceHolderForecaster(
     daily_rt_price_stds=daily_rt_price_stds,
 )
 
+# Keep solver consistent with existing examples/tests.
 solver = pyo.SolverFactory("cbc")
 
+# ---------------------------------------------------------------------------
+# 1) Tracker model object: used after SCED to follow dispatch and roll state.
+# ---------------------------------------------------------------------------
 tracking_model_object = IDCModel(
     rts_gmlc_generator_dataframe=rts_gmlc_generator_dataframe,
     rts_gmlc_bus_dataframe=rts_gmlc_bus_dataframe,
@@ -70,6 +95,9 @@ idc_tracker = Tracker(
     solver=solver,
 )
 
+# ---------------------------------------------------------------------------
+# 2) Projection tracker model object: used for DA projection roll-forward path.
+# ---------------------------------------------------------------------------
 projection_tracking_model_object = IDCModel(
     rts_gmlc_generator_dataframe=rts_gmlc_generator_dataframe,
     rts_gmlc_bus_dataframe=rts_gmlc_bus_dataframe,
@@ -84,6 +112,9 @@ idc_projection_tracker = Tracker(
     solver=solver,
 )
 
+# ---------------------------------------------------------------------------
+# 3) Bidder model object: used in DA/RT bidding optimization.
+# ---------------------------------------------------------------------------
 bidding_model_object = IDCModel(
     rts_gmlc_generator_dataframe=rts_gmlc_generator_dataframe,
     rts_gmlc_bus_dataframe=rts_gmlc_bus_dataframe,
@@ -100,11 +131,14 @@ idc_bidder = Bidder(
     forecaster=forecaster,
 )
 
+# Coordinator binds bidder + tracker + projection tracker to Prescient callbacks.
 coordinator = DoubleLoopCoordinator(
     bidder=idc_bidder,
     tracker=idc_tracker,
     projection_tracker=idc_projection_tracker,
 )
 
+# Prescient plugin contract:
+# These two names must exist at module level in plugin module.
 get_configuration = coordinator.get_configuration
 register_plugins = coordinator.register_plugins
