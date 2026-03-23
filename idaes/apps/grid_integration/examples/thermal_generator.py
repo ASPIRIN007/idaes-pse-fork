@@ -17,6 +17,9 @@ from idaes.apps.grid_integration import Tracker
 from idaes.apps.grid_integration import Bidder
 from idaes.apps.grid_integration import PlaceHolderForecaster
 from idaes.apps.grid_integration.model_data import ThermalGeneratorModelData
+import os
+this_module_dir = this_module_dir = os.path.dirname(__file__)
+
 
 from pyomo.common.dependencies import attempt_import
 
@@ -791,7 +794,7 @@ if __name__ == "__main__":
             "sced_solver": "cbc",
             "plugin": {
                 "doubleloop": {
-                    "module": "thermal_generator_prescient_plugin.py",
+                    "module": os.path.join(this_module_dir, "thermal_generator_prescient_plugin.py"),
                     "bidding_generator": generator,
                 }
             },
