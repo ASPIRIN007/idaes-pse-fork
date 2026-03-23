@@ -1,0 +1,3 @@
+Load Name,Bus,P Min MW,P Max MW,Preferred Load MW,Shortfall Penalty,Excess Penalty
+bus4,bus4,0.0,80.0,30.0,1000.0,10.0
+
