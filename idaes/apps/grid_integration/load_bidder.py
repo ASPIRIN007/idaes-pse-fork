@@ -69,10 +69,9 @@ class LoadBidder:
 
         return bids
 
-
     def _get_real_time_preferred_load(self, hour):
         full_profile = self.bidding_model_object.model_data.preferred_load
-        # Helper function to shift the preferred-load profile so the 
+        # Helper function to shift the preferred-load profile so the
         # RT horizon starts at the current hour
         shifted_profile = []
         for t in range(self.real_time_horizon):
@@ -99,8 +98,6 @@ class LoadBidder:
         )
 
         return prices
-
-
 
     def _select_price_series(self, prices):
         """
@@ -146,13 +143,9 @@ class LoadBidder:
                 return [float(v) for v in first_item]
 
             return [float(v) for v in prices]
-        # Helper function to select a single price series 
+        # Helper function to select a single price series
         # from the forecaster output, which may contain multiple scenarios/samples.
-        raise TypeError(
-            "Unsupported price forecast format returned by forecaster."
-        )
-        
-
+        raise TypeError("Unsupported price forecast format returned by forecaster.")
 
     def _get_real_time_energy_price(self, date, hour):
         """
@@ -170,16 +163,15 @@ class LoadBidder:
 
         return prices
 
-
     def compute_real_time_bids(self, date, hour=0):
 
         preferred_load = self._get_real_time_preferred_load(hour)
         self.update_real_time_model(preferred_load=preferred_load)
-        
+
         rt_prices = self._get_real_time_energy_price(date=date, hour=hour)
         rt_price_series = self._select_price_series(rt_prices)
         self._pass_energy_price(self.real_time_model, rt_price_series)
-        
+
         self.solver.solve(self.real_time_model, tee=False)
 
         bids = self._assemble_bids(
