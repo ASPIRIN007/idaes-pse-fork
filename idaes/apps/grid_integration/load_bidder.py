@@ -69,11 +69,11 @@ class LoadBidder:
 
         return bids
 
-# Helper function to shift the preferred-load profile so the 
-# RT horizon starts at the current hour
+
     def _get_real_time_preferred_load(self, hour):
         full_profile = self.bidding_model_object.model_data.preferred_load
-
+        # Helper function to shift the preferred-load profile so the 
+        # RT horizon starts at the current hour
         shifted_profile = []
         for t in range(self.real_time_horizon):
             idx = hour + t
@@ -100,24 +100,30 @@ class LoadBidder:
 
         return prices
 
-# Helper function to select a single price series 
-# from the forecaster output, which may contain multiple scenarios/samples.
+
 
     def _select_price_series(self, prices):
         """
         Select a single deterministic price series from the forecaster output.
 
-        For the current IDC bidder, we use the first scenario/sample.
+        For the current IDC bidder, we use the first scenario/sample when multiple
+        scenarios are provided.
         """
         if isinstance(prices, dict):
             first_key = sorted(prices.keys())[0]
             return [float(v) for v in prices[first_key]]
 
-        if isinstance(prices, list):
+        if hasattr(prices, "tolist"):
+            prices = prices.tolist()
+
+        if isinstance(prices, (list, tuple)):
             if len(prices) == 0:
                 raise ValueError("Received empty price forecast.")
 
             first_item = prices[0]
+
+            if hasattr(first_item, "tolist"):
+                first_item = first_item.tolist()
 
             if isinstance(first_item, (list, tuple)):
                 return [float(v) for v in first_item]
@@ -127,6 +133,9 @@ class LoadBidder:
         raise TypeError(
             "Unsupported price forecast format returned by forecaster."
         )
+
+        # Helper function to select a single price series 
+        # from the forecaster output, which may contain multiple scenarios/samples.
 
 
     def _get_real_time_energy_price(self, date, hour):
