@@ -19,6 +19,7 @@ class IDCLoadModelData:
         preferred_load,
         shortfall_penalty,
         excess_penalty,
+        service_value,
     ):
         self.load_name = load_name
         self.bus = bus
@@ -28,6 +29,7 @@ class IDCLoadModelData:
         self.preferred_load = [float(v) for v in preferred_load]
         self.shortfall_penalty = float(shortfall_penalty)
         self.excess_penalty = float(excess_penalty)
+        self.service_value = float(service_value)
 
 
 class InternetDataCenter:
@@ -67,6 +69,7 @@ class InternetDataCenter:
             preferred_load=self._model_data_dict["Preferred Load Profile MW"],
             shortfall_penalty=self._model_data_dict["Shortfall Penalty"],
             excess_penalty=self._model_data_dict["Excess Penalty"],
+            service_value=self._model_data_dict["Service Value"],
         )
 
         self.result_list = []
@@ -89,8 +92,7 @@ class InternetDataCenter:
         row = selected.iloc[0]
 
         preferred_load_cols = [
-            col for col in load_params.columns
-            if col.startswith("Preferred Load MW ")
+            col for col in load_params.columns if col.startswith("Preferred Load MW ")
         ]
 
         if not preferred_load_cols:
@@ -100,8 +102,7 @@ class InternetDataCenter:
             )
 
         preferred_load_cols = sorted(
-            preferred_load_cols,
-            key=lambda x: int(x.split()[-1])
+            preferred_load_cols, key=lambda x: int(x.split()[-1])
         )
 
         preferred_load_profile = [float(row[col]) for col in preferred_load_cols]
@@ -115,6 +116,7 @@ class InternetDataCenter:
             "Preferred Load Profile MW": preferred_load_profile,
             "Shortfall Penalty": row["Shortfall Penalty"],
             "Excess Penalty": row["Excess Penalty"],
+            "Service Value": row["Service Value"],
         }
 
         return model_data
@@ -157,6 +159,11 @@ class InternetDataCenter:
             initialize=preferred_load_init,
             mutable=True,
         )
+        b.energy_price = pyo.Param(
+            b.HOUR,
+            initialize=0.0,
+            mutable=True,
+        )
 
         b.shortfall_penalty = pyo.Param(
             initialize=float(model_data["Shortfall Penalty"]),
@@ -164,6 +171,10 @@ class InternetDataCenter:
         )
         b.excess_penalty = pyo.Param(
             initialize=float(model_data["Excess Penalty"]),
+            mutable=True,
+        )
+        b.service_value = pyo.Param(
+            initialize=float(model_data["Service Value"]),
             mutable=True,
         )
 
@@ -187,9 +198,7 @@ class InternetDataCenter:
 
         def preferred_load_balance_rule(m, t):
             return (
-                m.P_load[t]
-                + m.load_shortfall[t]
-                - m.load_excess[t]
+                m.P_load[t] + m.load_shortfall[t] - m.load_excess[t]
                 == m.preferred_load[t]
             )
 
@@ -200,13 +209,20 @@ class InternetDataCenter:
 
         def total_cost_rule(m, t):
             return (
-                m.shortfall_penalty * m.load_shortfall[t]
+                m.energy_price[t] * m.P_load[t]
+                - m.service_value * m.P_load[t]
+                + m.shortfall_penalty * m.load_shortfall[t]
                 + m.excess_penalty * m.load_excess[t]
             )
 
         b.total_cost = pyo.Expression(
             b.HOUR,
             rule=total_cost_rule,
+        )
+
+        b.obj = pyo.Objective(
+            expr=sum(b.total_cost[t] for t in b.HOUR),
+            sense=pyo.minimize,
         )
 
     def update_model(self, b, preferred_load=None):
@@ -231,9 +247,7 @@ class InternetDataCenter:
                 else:
                     b.preferred_load[t] = float(preferred_load[-1])
             else:
-                raise TypeError(
-                    "preferred_load must be a scalar, list/tuple, or dict."
-                )
+                raise TypeError("preferred_load must be a scalar, list/tuple, or dict.")
 
     def record_results(self, b, date=None, hour=None):
         """
