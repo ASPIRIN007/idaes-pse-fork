@@ -157,6 +157,11 @@ class InternetDataCenter:
             initialize=preferred_load_init,
             mutable=True,
         )
+        b.energy_price = pyo.Param(
+            b.HOUR,
+            initialize=0.0,
+            mutable=True,
+)
 
         b.shortfall_penalty = pyo.Param(
             initialize=float(model_data["Shortfall Penalty"]),
@@ -200,9 +205,20 @@ class InternetDataCenter:
 
         def total_cost_rule(m, t):
             return (
-                m.shortfall_penalty * m.load_shortfall[t]
+                m.energy_price[t] * m.P_load[t]
+                + m.shortfall_penalty * m.load_shortfall[t]
                 + m.excess_penalty * m.load_excess[t]
             )
+        b.total_cost = pyo.Expression(
+        b.HOUR,
+        rule=total_cost_rule,
+        )
+
+        b.obj = pyo.Objective(
+        expr=sum(b.total_cost[t] for t in b.HOUR),
+        sense=pyo.minimize,
+        )
+
 
         b.total_cost = pyo.Expression(
             b.HOUR,

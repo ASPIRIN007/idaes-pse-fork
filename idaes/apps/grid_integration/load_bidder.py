@@ -45,6 +45,10 @@ class LoadBidder:
         return model
 
     def compute_day_ahead_bids(self, date, hour=0):
+
+        da_prices = self._get_day_ahead_energy_price(date=date, hour=hour)
+        da_price_series = self._select_price_series(da_prices)
+        self._pass_energy_price(self.day_ahead_model, da_price_series)
         self.solver.solve(self.day_ahead_model, tee=False)
 
         # Convert the solved IDC demand schedule into the nested bid structure
@@ -80,11 +84,77 @@ class LoadBidder:
 
         return shifted_profile
 
+    def _get_day_ahead_energy_price(self, date, hour):
+        """
+        Fetch the day-ahead energy price forecast for the bidding load bus.
+        """
+        bus = self.bidding_model_object.model_data.bus
+
+        prices = self.forecaster.forecast_day_ahead_prices(
+            date=date,
+            hour=hour,
+            bus=bus,
+            horizon=self.day_ahead_horizon,
+            n_samples=self.n_scenario,
+        )
+
+        return prices
+
+# Helper function to select a single price series 
+# from the forecaster output, which may contain multiple scenarios/samples.
+
+    def _select_price_series(self, prices):
+        """
+        Select a single deterministic price series from the forecaster output.
+
+        For the current IDC bidder, we use the first scenario/sample.
+        """
+        if isinstance(prices, dict):
+            first_key = sorted(prices.keys())[0]
+            return [float(v) for v in prices[first_key]]
+
+        if isinstance(prices, list):
+            if len(prices) == 0:
+                raise ValueError("Received empty price forecast.")
+
+            first_item = prices[0]
+
+            if isinstance(first_item, (list, tuple)):
+                return [float(v) for v in first_item]
+
+            return [float(v) for v in prices]
+
+        raise TypeError(
+            "Unsupported price forecast format returned by forecaster."
+        )
+
+
+    def _get_real_time_energy_price(self, date, hour):
+        """
+        Fetch the real-time energy price forecast for the bidding load bus.
+        """
+        bus = self.bidding_model_object.model_data.bus
+
+        prices = self.forecaster.forecast_real_time_prices(
+            date=date,
+            hour=hour,
+            bus=bus,
+            horizon=self.real_time_horizon,
+            n_samples=self.n_scenario,
+        )
+
+        return prices
+
 
     def compute_real_time_bids(self, date, hour=0):
 
         preferred_load = self._get_real_time_preferred_load(hour)
         self.update_real_time_model(preferred_load=preferred_load)
+        
+        rt_prices = self._get_real_time_energy_price(date=date, hour=hour)
+        rt_price_series = self._select_price_series(rt_prices)
+        self._pass_energy_price(self.real_time_model, rt_price_series)
+        
         self.solver.solve(self.real_time_model, tee=False)
 
         bids = self._assemble_bids(
@@ -141,6 +211,16 @@ class LoadBidder:
             df_list.append(pd.DataFrame([result_dict]))
 
         self.bids_result_list.append(pd.concat(df_list, ignore_index=True))
+
+    def _pass_energy_price(self, model, energy_price):
+        """
+        Pass an hourly energy price series into the bidding model.
+        """
+        for t in model.HOUR:
+            if t < len(energy_price):
+                model.energy_price[t] = float(energy_price[t])
+            else:
+                model.energy_price[t] = float(energy_price[-1])
 
     def write_results(self, path):
         if len(self.bids_result_list) == 0:
