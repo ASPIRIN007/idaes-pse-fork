@@ -104,6 +104,8 @@ class IDCLoadPlugin:
         else:
             values = [float(p_load)]
 
+        # Some load entries start as scalars, so pad them out before overwriting
+        # a full DA or RT bidding horizon.
         if len(values) < horizon:
             fill_value = float(values[-1]) if len(values) > 0 else 0.0
             values.extend([fill_value] * (horizon - len(values)))
@@ -122,6 +124,7 @@ class IDCLoadPlugin:
         horizon = options.ruc_horizon
         values = self._ensure_time_series(load_dict, horizon)
 
+        # Day-ahead bids are written into the forward-looking RUC load series.
         for t in range(horizon):
             values[t] = bids[t][load_name]["p_load"]
 
@@ -133,6 +136,8 @@ class IDCLoadPlugin:
         horizon = options.sced_horizon
         values = self._ensure_time_series(load_dict, horizon)
 
+        # Real-time bids are keyed by global hour, but SCED consumes a local
+        # 0..horizon-1 series for the current solve.
         for k in range(horizon):
             values[k] = bids[hour + k][load_name]["p_load"]
 

@@ -47,6 +47,8 @@ class LoadBidder:
     def compute_day_ahead_bids(self, date, hour=0):
         self.solver.solve(self.day_ahead_model, tee=False)
 
+        # Convert the solved IDC demand schedule into the nested bid structure
+        # that the Prescient plugin writes back into the load dictionary.
         bids = self._assemble_bids(
             model=self.day_ahead_model,
             start_hour=hour,
@@ -63,7 +65,26 @@ class LoadBidder:
 
         return bids
 
+# Helper function to shift the preferred-load profile so the 
+# RT horizon starts at the current hour
+    def _get_real_time_preferred_load(self, hour):
+        full_profile = self.bidding_model_object.model_data.preferred_load
+
+        shifted_profile = []
+        for t in range(self.real_time_horizon):
+            idx = hour + t
+            if idx < len(full_profile):
+                shifted_profile.append(float(full_profile[idx]))
+            else:
+                shifted_profile.append(float(full_profile[-1]))
+
+        return shifted_profile
+
+
     def compute_real_time_bids(self, date, hour=0):
+
+        preferred_load = self._get_real_time_preferred_load(hour)
+        self.update_real_time_model(preferred_load=preferred_load)
         self.solver.solve(self.real_time_model, tee=False)
 
         bids = self._assemble_bids(
@@ -87,6 +108,7 @@ class LoadBidder:
         bids = {}
 
         for t in range(horizon):
+            # Prescient expects bids keyed first by market hour and then by load name.
             p_load = round(pyo.value(model.P_load[t]), 4)
             bids[start_hour + t] = {
                 load_name: {

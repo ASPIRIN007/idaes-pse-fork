@@ -44,6 +44,11 @@ def run_idc_load_v1_1(num_days=1):
         "compute_market_settlements": True,
         "monitor_all_contingencies": False,
         "output_solver_logs": False,
+            "plugin": {
+                "load_bidder": {
+                    "module": plugin_path,
+                }
+            },
 
     }
 
