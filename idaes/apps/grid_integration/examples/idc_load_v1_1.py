@@ -31,6 +31,7 @@ class IDCLoadModelData:
         self.excess_penalty = float(excess_penalty)
         self.service_value = float(service_value)
 
+
 class InternetDataCenter:
     """
     Internet Data Center (IDC) load model.
@@ -91,8 +92,7 @@ class InternetDataCenter:
         row = selected.iloc[0]
 
         preferred_load_cols = [
-            col for col in load_params.columns
-            if col.startswith("Preferred Load MW ")
+            col for col in load_params.columns if col.startswith("Preferred Load MW ")
         ]
 
         if not preferred_load_cols:
@@ -102,8 +102,7 @@ class InternetDataCenter:
             )
 
         preferred_load_cols = sorted(
-            preferred_load_cols,
-            key=lambda x: int(x.split()[-1])
+            preferred_load_cols, key=lambda x: int(x.split()[-1])
         )
 
         preferred_load_profile = [float(row[col]) for col in preferred_load_cols]
@@ -196,12 +195,10 @@ class InternetDataCenter:
             initialize=0.0,
             within=pyo.NonNegativeReals,
         )
-        
+
         def preferred_load_balance_rule(m, t):
             return (
-                m.P_load[t]
-                + m.load_shortfall[t]
-                - m.load_excess[t]
+                m.P_load[t] + m.load_shortfall[t] - m.load_excess[t]
                 == m.preferred_load[t]
             )
 
@@ -217,18 +214,16 @@ class InternetDataCenter:
                 + m.shortfall_penalty * m.load_shortfall[t]
                 + m.excess_penalty * m.load_excess[t]
             )
+
         b.total_cost = pyo.Expression(
             b.HOUR,
             rule=total_cost_rule,
-            )
+        )
 
         b.obj = pyo.Objective(
             expr=sum(b.total_cost[t] for t in b.HOUR),
             sense=pyo.minimize,
-            )
-
-
-
+        )
 
     def update_model(self, b, preferred_load=None):
         """
@@ -252,9 +247,7 @@ class InternetDataCenter:
                 else:
                     b.preferred_load[t] = float(preferred_load[-1])
             else:
-                raise TypeError(
-                    "preferred_load must be a scalar, list/tuple, or dict."
-                )
+                raise TypeError("preferred_load must be a scalar, list/tuple, or dict.")
 
     def record_results(self, b, date=None, hour=None):
         """
