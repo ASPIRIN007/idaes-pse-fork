@@ -110,6 +110,8 @@ class LoadBidder:
         scenarios are provided.
         """
         if isinstance(prices, dict):
+            if not prices:
+                raise ValueError("Received empty price forecast dictionary.")   
             first_key = sorted(prices.keys())[0]
             return [float(v) for v in prices[first_key]]
 
@@ -129,13 +131,12 @@ class LoadBidder:
                 return [float(v) for v in first_item]
 
             return [float(v) for v in prices]
-
+        # Helper function to select a single price series 
+        # from the forecaster output, which may contain multiple scenarios/samples.
         raise TypeError(
             "Unsupported price forecast format returned by forecaster."
         )
-
-        # Helper function to select a single price series 
-        # from the forecaster output, which may contain multiple scenarios/samples.
+        
 
 
     def _get_real_time_energy_price(self, date, hour):
