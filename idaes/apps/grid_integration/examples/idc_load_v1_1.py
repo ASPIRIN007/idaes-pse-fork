@@ -206,6 +206,7 @@ class InternetDataCenter:
         def total_cost_rule(m, t):
             return (
                 m.energy_price[t] * m.P_load[t]
+                - service_value * m.P_load[t]
                 + m.shortfall_penalty * m.load_shortfall[t]
                 + m.excess_penalty * m.load_excess[t]
             )
@@ -220,10 +221,7 @@ class InternetDataCenter:
         )
 
 
-        b.total_cost = pyo.Expression(
-            b.HOUR,
-            rule=total_cost_rule,
-        )
+
 
     def update_model(self, b, preferred_load=None):
         """
