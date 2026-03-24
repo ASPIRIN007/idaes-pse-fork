@@ -19,6 +19,7 @@ class IDCLoadModelData:
         preferred_load,
         shortfall_penalty,
         excess_penalty,
+        service_value,
     ):
         self.load_name = load_name
         self.bus = bus
@@ -28,7 +29,7 @@ class IDCLoadModelData:
         self.preferred_load = [float(v) for v in preferred_load]
         self.shortfall_penalty = float(shortfall_penalty)
         self.excess_penalty = float(excess_penalty)
-
+        self.service_value = float(service_value)
 
 class InternetDataCenter:
     """
@@ -67,6 +68,7 @@ class InternetDataCenter:
             preferred_load=self._model_data_dict["Preferred Load Profile MW"],
             shortfall_penalty=self._model_data_dict["Shortfall Penalty"],
             excess_penalty=self._model_data_dict["Excess Penalty"],
+            service_value=self._model_data_dict["Service Value"],
         )
 
         self.result_list = []
@@ -115,6 +117,7 @@ class InternetDataCenter:
             "Preferred Load Profile MW": preferred_load_profile,
             "Shortfall Penalty": row["Shortfall Penalty"],
             "Excess Penalty": row["Excess Penalty"],
+            "Service Value": row["Service Value"],
         }
 
         return model_data
@@ -206,7 +209,7 @@ class InternetDataCenter:
         def total_cost_rule(m, t):
             return (
                 m.energy_price[t] * m.P_load[t]
-                - service_value * m.P_load[t]
+                - self.service_value * m.P_load[t]
                 + m.shortfall_penalty * m.load_shortfall[t]
                 + m.excess_penalty * m.load_excess[t]
             )
