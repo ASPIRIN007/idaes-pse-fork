@@ -25,7 +25,7 @@ class IDCLoadModelData:
         self.bus_id = bus_id
         self.p_min = float(p_min)
         self.p_max = float(p_max)
-        self.preferred_load = float(preferred_load)
+        self.preferred_load = [float(v) for v in preferred_load]
         self.shortfall_penalty = float(shortfall_penalty)
         self.excess_penalty = float(excess_penalty)
 
@@ -64,7 +64,7 @@ class InternetDataCenter:
             bus_id=self._model_data_dict["Bus ID"],
             p_min=self._model_data_dict["P Min MW"],
             p_max=self._model_data_dict["P Max MW"],
-            preferred_load=self._model_data_dict["Preferred Load MW"],
+            preferred_load=self._model_data_dict["Preferred Load Profile MW"],
             shortfall_penalty=self._model_data_dict["Shortfall Penalty"],
             excess_penalty=self._model_data_dict["Excess Penalty"],
         )
@@ -88,13 +88,31 @@ class InternetDataCenter:
 
         row = selected.iloc[0]
 
+        preferred_load_cols = [
+            col for col in load_params.columns
+            if col.startswith("Preferred Load MW ")
+        ]
+
+        if not preferred_load_cols:
+            raise ValueError(
+                "No preferred load profile columns found. "
+                "Expected columns like 'Preferred Load MW 1', 'Preferred Load MW 2', ..."
+            )
+
+        preferred_load_cols = sorted(
+            preferred_load_cols,
+            key=lambda x: int(x.split()[-1])
+        )
+
+        preferred_load_profile = [float(row[col]) for col in preferred_load_cols]
+
         model_data = {
             "Load Name": row["Load Name"],
             "Bus": row["Bus"],
             "Bus ID": row["Bus ID"],
             "P Min MW": row["P Min MW"],
             "P Max MW": row["P Max MW"],
-            "Preferred Load MW": row["Preferred Load MW"],
+            "Preferred Load Profile MW": preferred_load_profile,
             "Shortfall Penalty": row["Shortfall Penalty"],
             "Excess Penalty": row["Excess Penalty"],
         }
@@ -125,9 +143,18 @@ class InternetDataCenter:
             mutable=False,
         )
 
+        preferred_load_profile = model_data["Preferred Load Profile MW"]
+
+        preferred_load_init = {}
+        for t in range(horizon):
+            if t < len(preferred_load_profile):
+                preferred_load_init[t] = float(preferred_load_profile[t])
+            else:
+                preferred_load_init[t] = float(preferred_load_profile[-1])
+
         b.preferred_load = pyo.Param(
             b.HOUR,
-            initialize=float(model_data["Preferred Load MW"]),
+            initialize=preferred_load_init,
             mutable=True,
         )
 
@@ -142,7 +169,7 @@ class InternetDataCenter:
 
         b.P_load = pyo.Var(
             b.HOUR,
-            initialize=float(model_data["Preferred Load MW"]),
+            initialize=preferred_load_init,
             bounds=(float(model_data["P Min MW"]), float(model_data["P Max MW"])),
             within=pyo.NonNegativeReals,
         )
@@ -198,7 +225,7 @@ class InternetDataCenter:
                 )
             elif isinstance(preferred_load, (list, tuple)):
                 if len(preferred_load) == 0:
-                    b.preferred_load[t] = 0.0
+                    raise ValueError("preferred_load list/tuple cannot be empty.")
                 elif t < len(preferred_load):
                     b.preferred_load[t] = float(preferred_load[t])
                 else:
