@@ -111,10 +111,25 @@ class LoadBidder:
         """
         if isinstance(prices, dict):
             if not prices:
-                raise ValueError("Received empty price forecast dictionary.")   
+                raise ValueError("Received empty price forecast dictionary.")
             first_key = sorted(prices.keys())[0]
-            return [float(v) for v in prices[first_key]]
+            scenario_prices = prices[first_key]
 
+            if hasattr(scenario_prices, "tolist"):
+                scenario_prices = scenario_prices.tolist()
+
+            if not isinstance(scenario_prices, (list, tuple)):
+                raise TypeError(
+                    "Unsupported price forecast format for scenario "
+                    f"{first_key!r}: expected a sequence of prices."
+                )
+
+            if len(scenario_prices) == 0:
+                raise ValueError(
+                    f"Received empty price forecast for scenario {first_key!r}."
+                )
+
+            return [float(v) for v in scenario_prices]
         if hasattr(prices, "tolist"):
             prices = prices.tolist()
 
