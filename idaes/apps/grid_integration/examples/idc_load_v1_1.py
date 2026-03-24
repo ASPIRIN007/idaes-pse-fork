@@ -175,8 +175,8 @@ class InternetDataCenter:
             mutable=True,
         )
         b.service_value = pyo.Param(
-            initialize=float(model_data["Service Value"]), 
-            mutable=True
+            initialize=float(model_data["Service Value"]),
+            mutable=True,
         )
 
         b.P_load = pyo.Var(
