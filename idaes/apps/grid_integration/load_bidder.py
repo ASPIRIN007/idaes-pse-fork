@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import pyomo.environ as pyo
+from pyomo.opt.base.solvers import OptSolver
 
 
 class LoadBidder:
@@ -31,8 +32,102 @@ class LoadBidder:
 
         self.day_ahead_model = self.formulate_DA_bidding_problem()
         self.real_time_model = self.formulate_RT_bidding_problem()
-
+        self._check_inputs()
         self.bids_result_list = []
+
+    def _check_inputs(self):
+        """
+        Validate the inputs required to construct the load bidder.
+        """
+        self._check_bidding_model_object()
+        self._check_horizons()
+        self._check_n_scenario()
+        self._check_solver()
+        self._check_forecaster()
+
+    def _check_bidding_model_object(self):
+        """
+        Check whether the bidding model object provides the interface
+        required by LoadBidder.
+        """
+        method_list = ["populate_model", "update_model"]
+        msg = "Bidding model object does not have required "
+
+        for m in method_list:
+            obtained_m = getattr(self.bidding_model_object, m, None)
+            if obtained_m is None:
+                raise AttributeError(
+                    msg + f"method '{m}()' for LoadBidder."
+                )
+
+        model_data = getattr(self.bidding_model_object, "model_data", None)
+        if model_data is None:
+            raise AttributeError(
+                msg + "property 'model_data' for LoadBidder."
+            )
+
+        required_model_data_attrs = ["load_name", "bus", "preferred_load"]
+        for attr in required_model_data_attrs:
+            if getattr(model_data, attr, None) is None:
+                raise AttributeError(
+                    f"bidding_model_object.model_data must provide '{attr}'."
+                )
+
+    def _check_horizons(self):
+        """
+        Check whether the DA and RT horizons are positive integers.
+        """
+        for name, value in [
+            ("day_ahead_horizon", self.day_ahead_horizon),
+            ("real_time_horizon", self.real_time_horizon),
+        ]:
+            if not isinstance(value, int):
+                raise TypeError(
+                    f"{name} should be an integer, but a {type(value).__name__} was given."
+                )
+            if value <= 0:
+                raise ValueError(
+                    f"{name} should be greater than zero, but {value} was given."
+                )
+
+    def _check_n_scenario(self):
+        """
+        Check whether the number of price scenarios is a positive integer.
+        """
+        if not isinstance(self.n_scenario, int):
+            raise TypeError(
+                f"The number of scenarios should be an integer, but a {type(self.n_scenario).__name__} was given."
+            )
+
+        if self.n_scenario <= 0:
+            raise ValueError(
+                f"The number of scenarios should be greater than zero, but {self.n_scenario} was given."
+            )
+
+    def _check_solver(self):
+        """
+        Check whether the provided solver is a valid Pyomo solver object.
+        """
+        if not isinstance(self.solver, OptSolver):
+            raise TypeError(
+                f"The provided solver {self.solver} is not a valid Pyomo solver."
+            )
+
+    def _check_forecaster(self):
+        """
+        Check whether the forecaster provides the methods required by LoadBidder.
+        """
+        required_methods = [
+            "forecast_day_ahead_prices",
+            "forecast_real_time_prices",
+        ]
+
+        for method_name in required_methods:
+            method = getattr(self.forecaster, method_name, None)
+            if method is None:
+                raise AttributeError(
+                    f"The forecaster must provide '{method_name}()' for LoadBidder."
+                )
 
     def formulate_DA_bidding_problem(self):
         model = pyo.ConcreteModel()
