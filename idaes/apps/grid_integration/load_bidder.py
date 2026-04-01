@@ -54,12 +54,12 @@ class LoadBidder:
         required by LoadBidder.
         """
         method_list = [
-        "populate_model",
-        "update_model",
-        "get_implemented_profile",
-        "get_last_backlog",
-        "record_results",
-        "write_results",
+            "populate_model",
+            "update_model",
+            "get_implemented_profile",
+            "get_last_backlog",
+            "record_results",
+            "write_results",
         ]
 
         msg = "Bidding model object does not have required "

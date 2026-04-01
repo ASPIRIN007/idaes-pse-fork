@@ -178,7 +178,7 @@ class InternetDataCenter:
             mutable=True,
         )
         b.max_backlog = pyo.Param(
-            initialize=min(
+            initialize=max(
                 float(model_data["Max Backlog"]),
                 0.0,
             ),
