@@ -1,3 +1,5 @@
+
+
 from numbers import Real
 import pyomo.environ as pyo
 import pandas as pd
@@ -16,9 +18,11 @@ class IDCLoadModelData:
         bus_id,
         p_min,
         p_max,
-        preferred_load,
-        shortfall_penalty,
-        excess_penalty,
+        workload_arrival,
+        initial_backlog,
+        backlog_penalty,
+        max_backlog,
+        nondeferrable_fraction,
         service_value,
     ):
         self.load_name = load_name
@@ -26,20 +30,20 @@ class IDCLoadModelData:
         self.bus_id = bus_id
         self.p_min = float(p_min)
         self.p_max = float(p_max)
-        self.preferred_load = [float(v) for v in preferred_load]
-        self.shortfall_penalty = float(shortfall_penalty)
-        self.excess_penalty = float(excess_penalty)
+        self.workload_arrival = [float(v) for v in workload_arrival]
+        self.initial_backlog = float(initial_backlog)
+        self.backlog_penalty = float(backlog_penalty)
+        self.max_backlog = float(max_backlog)
+        self.nondeferrable_fraction = float(nondeferrable_fraction)
         self.service_value = float(service_value)
 
 
 class InternetDataCenter:
     """
     Internet Data Center (IDC) load model.
-    This is a simple bidding-load model with bounded demand and
-    linear penalties for deviating from preferred load.
+    This model represents an IDC as a flexible load that serves arriving
+    workload subject to power limits while carrying unfinished work as backlog.
     """
-
-    segment_number = 4
 
     def __init__(
         self,
@@ -66,9 +70,11 @@ class InternetDataCenter:
             bus_id=self._model_data_dict["Bus ID"],
             p_min=self._model_data_dict["P Min MW"],
             p_max=self._model_data_dict["P Max MW"],
-            preferred_load=self._model_data_dict["Preferred Load Profile MW"],
-            shortfall_penalty=self._model_data_dict["Shortfall Penalty"],
-            excess_penalty=self._model_data_dict["Excess Penalty"],
+            workload_arrival=self._model_data_dict["Workload Arrival"],
+            initial_backlog=self._model_data_dict["Initial Backlog"],
+            backlog_penalty=self._model_data_dict["Backlog Penalty"],
+            max_backlog=self._model_data_dict["Max Backlog"],
+            nondeferrable_fraction=self._model_data_dict["Nondeferrable Fraction"],
             service_value=self._model_data_dict["Service Value"],
         )
 
@@ -91,21 +97,21 @@ class InternetDataCenter:
 
         row = selected.iloc[0]
 
-        preferred_load_cols = [
-            col for col in load_params.columns if col.startswith("Preferred Load MW ")
+        workload_arrival_cols = [
+            col for col in load_params.columns if col.startswith("Workload Arrival ")
         ]
 
-        if not preferred_load_cols:
+        if not workload_arrival_cols:
             raise ValueError(
-                "No preferred load profile columns found. "
-                "Expected columns like 'Preferred Load MW 1', 'Preferred Load MW 2', ..."
+                "No workload arrival columns found. "
+                "Expected columns like 'Workload Arrival 1', 'Workload Arrival 2', ..."
             )
 
-        preferred_load_cols = sorted(
-            preferred_load_cols, key=lambda x: int(x.split()[-1])
+        workload_arrival_cols = sorted(
+            workload_arrival_cols, key=lambda x: int(x.split()[-1])
         )
 
-        preferred_load_profile = [float(row[col]) for col in preferred_load_cols]
+        workload_arrival_profile = [float(row[col]) for col in workload_arrival_cols]
 
         model_data = {
             "Load Name": row["Load Name"],
@@ -113,13 +119,16 @@ class InternetDataCenter:
             "Bus ID": row["Bus ID"],
             "P Min MW": row["P Min MW"],
             "P Max MW": row["P Max MW"],
-            "Preferred Load Profile MW": preferred_load_profile,
-            "Shortfall Penalty": row["Shortfall Penalty"],
-            "Excess Penalty": row["Excess Penalty"],
+            "Workload Arrival": workload_arrival_profile,
+            "Initial Backlog": row["Initial Backlog"],
+            "Backlog Penalty": row["Backlog Penalty"],
+            "Max Backlog": row["Max Backlog"],
+            "Nondeferrable Fraction": row["Nondeferrable Fraction"],
             "Service Value": row["Service Value"],
         }
 
         return model_data
+
 
     @property
     def model_data(self):
@@ -145,34 +154,47 @@ class InternetDataCenter:
             mutable=False,
         )
 
-        preferred_load_profile = model_data["Preferred Load Profile MW"]
-
-        preferred_load_init = {}
+        workload_arrival_profile = model_data["Workload Arrival"]
+        workload_arrival_init = {}
         for t in range(horizon):
-            if t < len(preferred_load_profile):
-                preferred_load_init[t] = float(preferred_load_profile[t])
+            if t < len(workload_arrival_profile):
+                workload_arrival_init[t] = float(workload_arrival_profile[t])
             else:
-                preferred_load_init[t] = float(preferred_load_profile[-1])
+                workload_arrival_init[t] = float(workload_arrival_profile[-1])
 
-        b.preferred_load = pyo.Param(
+        b.workload_arrival = pyo.Param(
             b.HOUR,
-            initialize=preferred_load_init,
+            initialize=workload_arrival_init,
             mutable=True,
         )
+
+        b.initial_backlog = pyo.Param(
+            initialize=float(model_data["Initial Backlog"]),
+            mutable=True,
+        )
+
+        b.backlog_penalty = pyo.Param(
+            initialize=float(model_data["Backlog Penalty"]),
+            mutable=True,
+        )
+        b.max_backlog = pyo.Param(
+            initialize=max(
+                float(model_data["Max Backlog"]),
+                0.0,
+            ),
+            mutable=False,
+        )
+        b.nondeferrable_fraction = pyo.Param(
+            initialize=float(model_data["Nondeferrable Fraction"]),
+            mutable=False,
+        )
+
         b.energy_price = pyo.Param(
             b.HOUR,
             initialize=0.0,
             mutable=True,
         )
 
-        b.shortfall_penalty = pyo.Param(
-            initialize=float(model_data["Shortfall Penalty"]),
-            mutable=True,
-        )
-        b.excess_penalty = pyo.Param(
-            initialize=float(model_data["Excess Penalty"]),
-            mutable=True,
-        )
         b.service_value = pyo.Param(
             initialize=float(model_data["Service Value"]),
             mutable=True,
@@ -180,39 +202,87 @@ class InternetDataCenter:
 
         b.P_load = pyo.Var(
             b.HOUR,
-            initialize=preferred_load_init,
+            initialize={
+                t: min(workload_arrival_init[t], float(model_data["P Max MW"]))
+                for t in b.HOUR
+            },
             bounds=(float(model_data["P Min MW"]), float(model_data["P Max MW"])),
             within=pyo.NonNegativeReals,
         )
 
-        b.load_shortfall = pyo.Var(
+        b.work_served = pyo.Var(
             b.HOUR,
-            initialize=0.0,
+            initialize=workload_arrival_init,
             within=pyo.NonNegativeReals,
         )
-        b.load_excess = pyo.Var(
+
+        b.backlog = pyo.Var(
             b.HOUR,
             initialize=0.0,
             within=pyo.NonNegativeReals,
         )
 
-        def preferred_load_balance_rule(m, t):
+        def served_load_link_rule(m, t):
+            return m.work_served[t] == m.P_load[t]
+
+        b.served_load_link = pyo.Constraint(
+            b.HOUR,
+            rule=served_load_link_rule,
+        )
+
+        # A fixed share of each hour's arriving workload is treated as
+        # non-deferrable and must be served immediately.
+        def nondeferrable_service_rule(m, t):
+            return m.work_served[t] >= m.nondeferrable_fraction * m.workload_arrival[t]
+
+        b.nondeferrable_service = pyo.Constraint(
+            b.HOUR,
+            rule=nondeferrable_service_rule,
+        )
+
+        # Served work in each hour cannot exceed the work currently available:
+        # the incoming workload plus any carried backlog.
+        def served_work_limit_rule(m, t):
+            if t == 0:
+                return m.work_served[t] <= m.initial_backlog + m.workload_arrival[t]
+            return m.work_served[t] <= m.backlog[t - 1] + m.workload_arrival[t]
+
+        b.served_work_limit = pyo.Constraint(
+            b.HOUR,
+            rule=served_work_limit_rule,
+        )
+
+        def backlog_balance_rule(m, t):
+            if t == 0:
+                return (
+                    m.backlog[t]
+                    == m.initial_backlog + m.workload_arrival[t] - m.work_served[t]
+                )
             return (
-                m.P_load[t] + m.load_shortfall[t] - m.load_excess[t]
-                == m.preferred_load[t]
+                m.backlog[t]
+                == m.backlog[t - 1] + m.workload_arrival[t] - m.work_served[t]
             )
 
-        b.preferred_load_balance = pyo.Constraint(
+        b.backlog_balance = pyo.Constraint(
             b.HOUR,
-            rule=preferred_load_balance_rule,
+            rule=backlog_balance_rule,
+        )
+
+        # Keep backlog within a hard cap so the load cannot defer more work than
+        # it could plausibly recover from with available capacity.
+        def backlog_limit_rule(m, t):
+            return m.backlog[t] <= m.max_backlog
+
+        b.backlog_limit = pyo.Constraint(
+            b.HOUR,
+            rule=backlog_limit_rule,
         )
 
         def total_cost_rule(m, t):
             return (
                 m.energy_price[t] * m.P_load[t]
-                - m.service_value * m.P_load[t]
-                + m.shortfall_penalty * m.load_shortfall[t]
-                + m.excess_penalty * m.load_excess[t]
+                - m.service_value * m.work_served[t]
+                + m.backlog_penalty * m.backlog[t]
             )
 
         b.total_cost = pyo.Expression(
@@ -225,31 +295,78 @@ class InternetDataCenter:
             sense=pyo.minimize,
         )
 
-    def update_model(self, b, preferred_load=None):
+    def update_model(self, b, workload_arrival=None, initial_backlog=None):
         """
         Update mutable model inputs for the IDC load block.
         """
-        if preferred_load is None:
-            return
-
-        for t in b.HOUR:
-            if isinstance(preferred_load, Real):
-                b.preferred_load[t] = float(preferred_load)
-            elif isinstance(preferred_load, dict):
-                b.preferred_load[t] = float(
-                    preferred_load.get(t, pyo.value(b.preferred_load[t]))
-                )
-            elif isinstance(preferred_load, (list, tuple)):
-                if len(preferred_load) == 0:
-                    raise ValueError("preferred_load list/tuple cannot be empty.")
-                elif t < len(preferred_load):
-                    b.preferred_load[t] = float(preferred_load[t])
+        if workload_arrival is not None:
+            for t in b.HOUR:
+                if isinstance(workload_arrival, Real):
+                    b.workload_arrival[t] = float(workload_arrival)
+                elif isinstance(workload_arrival, dict):
+                    b.workload_arrival[t] = float(
+                        workload_arrival.get(t, pyo.value(b.workload_arrival[t]))
+                    )
+                elif isinstance(workload_arrival, (list, tuple)):
+                    if len(workload_arrival) == 0:
+                        raise ValueError("workload_arrival list/tuple cannot be empty.")
+                    elif t < len(workload_arrival):
+                        b.workload_arrival[t] = float(workload_arrival[t])
+                    else:
+                        b.workload_arrival[t] = float(workload_arrival[-1])
                 else:
-                    b.preferred_load[t] = float(preferred_load[-1])
-            else:
-                raise TypeError("preferred_load must be a scalar, list/tuple, or dict.")
+                    raise TypeError(
+                        "workload_arrival must be a scalar, list/tuple, or dict."
+                    )
 
-    def record_results(self, b, date=None, hour=None):
+        if initial_backlog is not None:
+            b.initial_backlog = float(initial_backlog)
+
+    @staticmethod
+    def get_implemented_profile(b, last_implemented_time_step):
+        """
+        Get the implemented workload-serving profile from the last solve.
+
+        Args:
+            b: Pyomo block
+            last_implemented_time_step: last implemented time index
+
+        Returns:
+            dict: implemented profile information
+        """
+        implemented_power = [
+            pyo.value(b.P_load[t]) for t in range(last_implemented_time_step + 1)
+        ]
+        implemented_work_served = [
+            pyo.value(b.work_served[t]) for t in range(last_implemented_time_step + 1)
+        ]
+        implemented_backlog = [
+            pyo.value(b.backlog[t]) for t in range(last_implemented_time_step + 1)
+        ]
+
+        return {
+            "implemented_power": implemented_power,
+            "implemented_work_served": implemented_work_served,
+            "implemented_backlog": implemented_backlog,
+        }
+
+
+    @staticmethod
+    def get_last_backlog(b, last_implemented_time_step):
+        """
+        Return the last implemented backlog value.
+
+        Args:
+            b: Pyomo block
+            last_implemented_time_step: last implemented time index
+
+        Returns:
+            float: backlog at the last implemented time step
+        """
+        return pyo.value(b.backlog[last_implemented_time_step])
+
+
+    def record_results(self, b, date=None, hour=None, market=None, **kwargs):
         """
         Record solved IDC model results for the current block.
         """
@@ -260,12 +377,13 @@ class InternetDataCenter:
             result_dict = {
                 "Date": date,
                 "Hour": hour,
+                "Market": market,
                 "Time": t,
                 "Load": load_name,
                 "P Load [MW]": pyo.value(b.P_load[t]),
-                "Preferred Load [MW]": pyo.value(b.preferred_load[t]),
-                "Load Shortfall [MW]": pyo.value(b.load_shortfall[t]),
-                "Load Excess [MW]": pyo.value(b.load_excess[t]),
+                "Workload Arrival": pyo.value(b.workload_arrival[t]),
+                "Work Served": pyo.value(b.work_served[t]),
+                "Backlog": pyo.value(b.backlog[t]),
                 "Total Cost [$]": pyo.value(b.total_cost[t]),
             }
             df_list.append(pd.DataFrame([result_dict]))

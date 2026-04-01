@@ -28,12 +28,15 @@ class LoadBidder:
         self.solver = solver
         self.forecaster = forecaster
 
-        self.load = self.bidding_model_object.model_data.load_name
-
         self.day_ahead_model = self.formulate_DA_bidding_problem()
         self.real_time_model = self.formulate_RT_bidding_problem()
         self._check_inputs()
         self.bids_result_list = []
+
+        self.load = self.bidding_model_object.model_data.load_name
+        self.current_backlog = self.bidding_model_object.model_data.initial_backlog
+
+
 
     def _check_inputs(self):
         """
@@ -50,7 +53,15 @@ class LoadBidder:
         Check whether the bidding model object provides the interface
         required by LoadBidder.
         """
-        method_list = ["populate_model", "update_model"]
+        method_list = [
+            "populate_model",
+            "update_model",
+            "get_implemented_profile",
+            "get_last_backlog",
+            "record_results",
+            "write_results",
+        ]
+
         msg = "Bidding model object does not have required "
 
         for m in method_list:
@@ -66,7 +77,7 @@ class LoadBidder:
                 msg + "property 'model_data' for LoadBidder."
             )
 
-        required_model_data_attrs = ["load_name", "bus", "preferred_load"]
+        required_model_data_attrs = ["load_name", "bus", "workload_arrival", "initial_backlog"]
         for attr in required_model_data_attrs:
             if getattr(model_data, attr, None) is None:
                 raise AttributeError(
@@ -161,12 +172,18 @@ class LoadBidder:
             hour=hour,
             market="Day-ahead",
         )
+        self.bidding_model_object.record_results(
+            self.day_ahead_model, 
+            date=date, 
+            hour=hour, 
+            market="Day-ahead",
+        )
 
         return bids
 
-    def _get_real_time_preferred_load(self, hour):
-        full_profile = self.bidding_model_object.model_data.preferred_load
-        # Helper function to shift the preferred-load profile so the
+    def _get_real_time_workload_arrival(self, hour):
+        full_profile = self.bidding_model_object.model_data.workload_arrival
+        # Helper function to shift the workload arrival profile so the
         # RT horizon starts at the current hour
         shifted_profile = []
         for t in range(self.real_time_horizon):
@@ -260,8 +277,11 @@ class LoadBidder:
 
     def compute_real_time_bids(self, date, hour=0):
 
-        preferred_load = self._get_real_time_preferred_load(hour)
-        self.update_real_time_model(preferred_load=preferred_load)
+        workload_arrival = self._get_real_time_workload_arrival(hour)
+        self.update_real_time_model(
+            workload_arrival=workload_arrival,
+            initial_backlog=self.current_backlog,
+        )
 
         rt_prices = self._get_real_time_energy_price(date=date, hour=hour)
         rt_price_series = self._select_price_series(rt_prices)
@@ -282,6 +302,14 @@ class LoadBidder:
             hour=hour,
             market="Real-time",
         )
+        self.bidding_model_object.record_results(
+            self.real_time_model, 
+            date=date, 
+            hour=hour, 
+            market="Real-time",
+        )
+
+        self._update_real_time_backlog(last_implemented_time_step=0)
 
         return bids
 
@@ -305,6 +333,16 @@ class LoadBidder:
 
     def update_real_time_model(self, **kwargs):
         self.bidding_model_object.update_model(self.real_time_model, **kwargs)
+
+    def _update_real_time_backlog(self, last_implemented_time_step=0):
+        """
+        Update the RT initial backlog using the realized backlog from the
+        last implemented RT step.
+        """
+        self.current_backlog = self.bidding_model_object.get_last_backlog(
+            self.real_time_model,
+            last_implemented_time_step,
+        )
 
     def record_bids(self, bids, model, date, hour, market):
         df_list = []
@@ -335,6 +373,9 @@ class LoadBidder:
                 model.energy_price[t] = float(energy_price[-1])
 
     def write_results(self, path):
+
+        self.bidding_model_object.write_results(path=path)
+
         if len(self.bids_result_list) == 0:
             return
 
