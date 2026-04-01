@@ -175,6 +175,29 @@ Result:
 - The backlog model behaves more consistently and is easier to interpret from
   `idc_load_detail.csv`.
 
+### 7. Result logging and bidder regression coverage
+
+Goal:
+- Make the IDC internal result log easier to analyze and add a regression guard
+  for the new backlog-carryover behavior in the bidder.
+
+Main changes:
+- Updated [idc_load_v1_1.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_v1_1.py)
+  so `record_results()` accepts `market=None, **kwargs` and writes a `Market`
+  column into `idc_load_detail.csv`.
+- Updated [load_bidder.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/load_bidder.py)
+  so both DA and RT solves pass the market label through to
+  `record_results(...)`.
+- Added [test_load_bidder.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/tests/test_load_bidder.py)
+  to cover backlog propagation across successive real-time bidding solves.
+
+Result:
+- `idc_load_detail.csv` now distinguishes day-ahead and real-time solves.
+- The backlog-carryover path in `LoadBidder` has a focused unit regression test.
+- Verified with:
+  - `pytest -q idaes/apps/grid_integration/tests/test_load_bidder.py`
+  - result: `1 passed`
+
 ## Current Status
 
 The IDC workflow currently supports:
@@ -186,6 +209,8 @@ The IDC workflow currently supports:
 - hard backlog cap
 - nondeferrable workload fraction
 - detailed internal logging through `idc_load_detail.csv`
+- market-labeled IDC result rows
+- a regression test covering RT backlog carryover in `LoadBidder`
 
 The workflow is now beyond a simple “preferred load profile” example and has a
 stateful IDC-specific formulation.
@@ -199,9 +224,11 @@ carryover, price forecasts, and a bounded service model. The runner produces
 Prescient outputs in `demo_outputs/idc_load_v1_1_*`, including
 `load_bidder_detail.csv`, `bus_detail.csv`, and `idc_load_detail.csv`. In the
 current state, the model is successfully modifying `bus4` demand, writing its
-internal backlog/work-served trajectory, and carrying backlog through the RT
-loop, but the RT behavior can still look somewhat bursty because the horizon is
-short and the formulation is still intentionally simple and linear.
+internal backlog/work-served trajectory, labeling those rows by market, and
+carrying backlog through the RT loop. The backlog is now bounded by a hard cap
+and a nondeferrable workload fraction. The RT behavior can still look somewhat
+bursty because the horizon is short and the formulation is still intentionally
+simple and linear.
 
 ## Key Interfaces Between Files
 
@@ -218,7 +245,8 @@ The current file-to-file flow is:
    converts the CSV row into model data and builds the Pyomo optimization model.
 4. [load_bidder.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/load_bidder.py)
    uses the IDC model object, pulls forecasts from the forecaster, solves DA/RT
-   problems, assembles Prescient-compatible load bids, and records results.
+   problems, assembles Prescient-compatible load bids, records bidder-level
+   results, and forwards IDC-model results to `idc_load_detail.csv`.
 5. [idc_load_prescient_plugin.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_prescient_plugin.py)
    injects those bids into Prescient callbacks by modifying the target load’s
    `p_load` time series.
@@ -271,6 +299,9 @@ must be updated too.
   physical conversion model. It is intentionally simple for now.
 - The backlog carryover logic is lightweight and currently handled in the bidder
   using `initial_backlog`, not yet through a full tracker/coordinator design.
+- There is currently only a focused unit test for backlog carryover in
+  `LoadBidder`; broader end-to-end test coverage for the IDC path is still
+  limited.
 - The placeholder forecaster is still a stylized statistical forecast model,
   not a realistic trained forecasting model.
 - The IDC formulation is now workload/backlog-based, so any older code or
