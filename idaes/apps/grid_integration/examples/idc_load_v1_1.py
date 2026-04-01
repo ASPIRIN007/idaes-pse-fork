@@ -366,7 +366,7 @@ class InternetDataCenter:
         return pyo.value(b.backlog[last_implemented_time_step])
 
 
-    def record_results(self, b, date=None, hour=None):
+    def record_results(self, b, date=None, hour=None, market=None, **kwargs):
         """
         Record solved IDC model results for the current block.
         """
@@ -377,6 +377,7 @@ class InternetDataCenter:
             result_dict = {
                 "Date": date,
                 "Hour": hour,
+                "Market": market,
                 "Time": t,
                 "Load": load_name,
                 "P Load [MW]": pyo.value(b.P_load[t]),

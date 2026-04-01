@@ -28,13 +28,15 @@ class LoadBidder:
         self.solver = solver
         self.forecaster = forecaster
 
-        self.load = self.bidding_model_object.model_data.load_name
-        self.current_backlog = self.bidding_model_object.model_data.initial_backlog
-
         self.day_ahead_model = self.formulate_DA_bidding_problem()
         self.real_time_model = self.formulate_RT_bidding_problem()
         self._check_inputs()
         self.bids_result_list = []
+
+        self.load = self.bidding_model_object.model_data.load_name
+        self.current_backlog = self.bidding_model_object.model_data.initial_backlog
+
+
 
     def _check_inputs(self):
         """
@@ -56,6 +58,8 @@ class LoadBidder:
         "update_model",
         "get_implemented_profile",
         "get_last_backlog",
+        "record_results",
+        "write_results",
         ]
 
         msg = "Bidding model object does not have required "
@@ -172,6 +176,7 @@ class LoadBidder:
             self.day_ahead_model, 
             date=date, 
             hour=hour, 
+            market="Day-ahead",
         )
 
         return bids
@@ -301,6 +306,7 @@ class LoadBidder:
             self.real_time_model, 
             date=date, 
             hour=hour, 
+            market="Real-time",
         )
 
         self._update_real_time_backlog(last_implemented_time_step=0)
