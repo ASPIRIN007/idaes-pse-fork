@@ -9,15 +9,15 @@ and what the current state of the workflow is.
 
 Main IDC-related files in this workflow:
 
-- [idc_load_data.csv](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_data.csv)
-- [idc_utils.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_utils.py)
-- [idc_load_v1_1.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_v1_1.py)
-- [load_bidder.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/load_bidder.py)
-- [idc_load_prescient_plugin.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_prescient_plugin.py)
-- [idc_load_v1_1_run.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_v1_1_run.py)
-- [run_thermal_generator_comparison.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/run_thermal_generator_comparison.py)
-- [prescient_lmp_stats.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/prescient_lmp_stats.py)
-- [export_lmp_forecast_arrays.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/export_lmp_forecast_arrays.py)
+- [idc_load_data.csv](idc_load_data.csv)
+- [idc_utils.py](idc_utils.py)
+- [idc_load_v1_1.py](idc_load_v1_1.py)
+- [load_bidder.py](../load_bidder.py)
+- [idc_load_prescient_plugin.py](idc_load_prescient_plugin.py)
+- [idc_load_v1_1_run.py](idc_load_v1_1_run.py)
+- [run_thermal_generator_comparison.py](run_thermal_generator_comparison.py)
+- [prescient_lmp_stats.py](prescient_lmp_stats.py)
+- [export_lmp_forecast_arrays.py](export_lmp_forecast_arrays.py)
 
 ## Development History
 
@@ -36,12 +36,12 @@ Main choices:
 Work completed:
 - Confirmed that Egret/Prescient creates load elements keyed by bus name for
   the 5-bus case.
-- Created [idc_load_data.csv](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_data.csv) as a custom IDC asset table.
-- Created [idc_utils.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_utils.py) to load IDC input data, bus data, and price statistics.
-- Created [idc_load_v1_1.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_v1_1.py) with the first `InternetDataCenter` model.
-- Created [load_bidder.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/load_bidder.py) for a simple load bidder.
-- Created [idc_load_prescient_plugin.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_prescient_plugin.py) to inject load bids into Prescient.
-- Created [idc_load_v1_1_run.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_v1_1_run.py) as the runner.
+- Created [idc_load_data.csv](idc_load_data.csv) as a custom IDC asset table.
+- Created [idc_utils.py](idc_utils.py) to load IDC input data, bus data, and price statistics.
+- Created [idc_load_v1_1.py](idc_load_v1_1.py) with the first `InternetDataCenter` model.
+- Created [load_bidder.py](../load_bidder.py) for a simple load bidder.
+- Created [idc_load_prescient_plugin.py](idc_load_prescient_plugin.py) to inject load bids into Prescient.
+- Created [idc_load_v1_1_run.py](idc_load_v1_1_run.py) as the runner.
 
 Result:
 - The end-to-end Prescient loop ran successfully.
@@ -57,8 +57,8 @@ Goal:
 - Replace a single constant IDC load value with an hourly profile.
 
 Main changes:
-- Extended [idc_load_data.csv](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_data.csv) with `Preferred Load MW 1` through `Preferred Load MW 24`.
-- Updated `IDCLoadModelData` and `assemble_model_data()` in [idc_load_v1_1.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_v1_1.py) to read an hourly preferred-load profile.
+- Extended [idc_load_data.csv](idc_load_data.csv) with `Preferred Load MW 1` through `Preferred Load MW 24`.
+- Updated `IDCLoadModelData` and `assemble_model_data()` in [idc_load_v1_1.py](idc_load_v1_1.py) to read an hourly preferred-load profile.
 - Updated `populate_model()` so `preferred_load[t]` was initialized hour by hour.
 - Updated `update_model()` and the RT bidder logic so the preferred-load profile shifted with the simulated real-time hour.
 
@@ -78,8 +78,8 @@ Goal:
   preferred-load profile.
 
 Main changes:
-- Added `energy_price[t]` as a mutable parameter in [idc_load_v1_1.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_v1_1.py).
-- Updated [load_bidder.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/load_bidder.py) to fetch DA and RT price forecasts and pass them into the model before solve.
+- Added `energy_price[t]` as a mutable parameter in [idc_load_v1_1.py](idc_load_v1_1.py).
+- Updated [load_bidder.py](../load_bidder.py) to fetch DA and RT price forecasts and pass them into the model before solve.
 - Added a real objective in the IDC model so Pyomo optimized the cost expression instead of only finding a feasible point.
 
 Important fixes made during this stage:
@@ -106,9 +106,9 @@ Goal:
   consistent with the 5-bus case.
 
 Main changes:
-- Added [prescient_lmp_stats.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/prescient_lmp_stats.py) to run a longer vanilla Prescient case and compute hourly DA/RT LMP statistics.
-- Added [export_lmp_forecast_arrays.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/export_lmp_forecast_arrays.py) to export the four placeholder-forecaster arrays automatically from `bus_detail.csv`.
-- Added [run_thermal_generator_comparison.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/run_thermal_generator_comparison.py) to compare vanilla Prescient and plugin-modified runs more easily.
+- Added [prescient_lmp_stats.py](prescient_lmp_stats.py) to run a longer vanilla Prescient case and compute hourly DA/RT LMP statistics.
+- Added [export_lmp_forecast_arrays.py](export_lmp_forecast_arrays.py) to export the four placeholder-forecaster arrays automatically from `bus_detail.csv`.
+- Added [run_thermal_generator_comparison.py](run_thermal_generator_comparison.py) to compare vanilla Prescient and plugin-modified runs more easily.
 
 Findings:
 - The empirical bus-level arrays from repeated 5-bus simulations were not a
@@ -135,14 +135,14 @@ Main modeling shift:
   - `backlog_penalty`
 
 Main changes:
-- Reworked [idc_load_data.csv](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_data.csv) to remove preferred-load columns and add workload/backlog inputs.
-- Reworked [idc_load_v1_1.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_v1_1.py):
+- Reworked [idc_load_data.csv](idc_load_data.csv) to remove preferred-load columns and add workload/backlog inputs.
+- Reworked [idc_load_v1_1.py](idc_load_v1_1.py):
   - removed preferred-load-centered logic
   - added workload arrival and backlog state
   - added backlog balance constraints
   - linked `work_served[t]` to `P_load[t]`
   - added `get_implemented_profile()` and `get_last_backlog()` helpers
-- Updated [load_bidder.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/load_bidder.py):
+- Updated [load_bidder.py](../load_bidder.py):
   - switched RT profile shifting from `preferred_load` to `workload_arrival`
   - added backlog carryover support using `initial_backlog`
   - wired IDC `record_results()` and `write_results()` so `idc_load_detail.csv` is produced
@@ -160,8 +160,8 @@ Goal:
 - Reduce unrealistic backlog growth and extreme deferral.
 
 Main changes:
-- Added `Max Backlog` to [idc_load_data.csv](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_data.csv) and enforced `backlog[t] <= max_backlog` in [idc_load_v1_1.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_v1_1.py).
-- Added `Nondeferrable Fraction` to [idc_load_data.csv](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_data.csv).
+- Added `Max Backlog` to [idc_load_data.csv](idc_load_data.csv) and enforced `backlog[t] <= max_backlog` in [idc_load_v1_1.py](idc_load_v1_1.py).
+- Added `Nondeferrable Fraction` to [idc_load_data.csv](idc_load_data.csv).
 - Enforced a minimum-served-work constraint:
   - `work_served[t] >= nondeferrable_fraction * workload_arrival[t]`
 
@@ -182,13 +182,13 @@ Goal:
   for the new backlog-carryover behavior in the bidder.
 
 Main changes:
-- Updated [idc_load_v1_1.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_v1_1.py)
+- Updated [idc_load_v1_1.py](idc_load_v1_1.py)
   so `record_results()` accepts `market=None, **kwargs` and writes a `Market`
   column into `idc_load_detail.csv`.
-- Updated [load_bidder.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/load_bidder.py)
+- Updated [load_bidder.py](../load_bidder.py)
   so both DA and RT solves pass the market label through to
   `record_results(...)`.
-- Added [test_load_bidder.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/tests/test_load_bidder.py)
+- Added [test_load_bidder.py](../tests/test_load_bidder.py)
   to cover backlog propagation across successive real-time bidding solves.
 
 Result:
@@ -236,21 +236,21 @@ simple and linear.
 
 The current file-to-file flow is:
 
-1. [idc_load_data.csv](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_data.csv)
+1. [idc_load_data.csv](idc_load_data.csv)
    provides the IDC asset parameters and workload profile.
-2. [idc_utils.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_utils.py)
+2. [idc_utils.py](idc_utils.py)
    reads the IDC CSV, the 5-bus case bus data, and the placeholder price
    statistics.
-3. [idc_load_v1_1.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_v1_1.py)
+3. [idc_load_v1_1.py](idc_load_v1_1.py)
    converts the CSV row into model data and builds the Pyomo optimization model.
-4. [load_bidder.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/load_bidder.py)
+4. [load_bidder.py](../load_bidder.py)
    uses the IDC model object, pulls forecasts from the forecaster, solves DA/RT
    problems, assembles Prescient-compatible load bids, records bidder-level
    results, and forwards IDC-model results to `idc_load_detail.csv`.
-5. [idc_load_prescient_plugin.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_prescient_plugin.py)
+5. [idc_load_prescient_plugin.py](idc_load_prescient_plugin.py)
    injects those bids into Prescient callbacks by modifying the target load’s
    `p_load` time series.
-6. [idc_load_v1_1_run.py](/Users/vardhans/Projects/idaes-pse/idaes/apps/grid_integration/examples/idc_load_v1_1_run.py)
+6. [idc_load_v1_1_run.py](idc_load_v1_1_run.py)
    points Prescient at the 5-bus dataset and runs the whole example.
 
 ### What `load_bidder.py` expects from `idc_load_v1_1.py`
