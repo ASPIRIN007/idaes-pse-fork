@@ -59,6 +59,15 @@ class IDCLoadPlugin:
         self.bidder = bidder
 
     def get_configuration(self, key):
+        """
+        Register customized commandline options.
+
+        Arguments:
+            key: plugin name
+
+        Returns:
+            config: Prescient config dict
+        """
         config = ConfigDict()
 
         config.declare(
@@ -78,6 +87,7 @@ class IDCLoadPlugin:
         context.register_before_ruc_solve_callback(self.bid_into_DAM)
         context.register_before_operations_solve_callback(self.bid_into_RTM)
         context.register_finalization_callback(self.write_plugin_results)
+        context.register_after_operations_solve_callback(self.track_sced_dispatch)
 
     @property
     def prescient_plugin_module(self):
@@ -95,6 +105,13 @@ class IDCLoadPlugin:
             )
 
         return loads[load_name]
+
+    def _get_actual_dispatch(self, sced_instance):
+        load_dict = self._get_load_dict(sced_instance)
+        p_load = load_dict.get("p_load", 0.0)
+        if isinstance(p_load, dict) and p_load.get("data_type") == "time_series":
+            return float(p_load["values"][0])
+        return float(p_load)
 
     def _ensure_time_series(self, load_dict, horizon):
         p_load = load_dict.get("p_load", 0.0)
@@ -136,10 +153,17 @@ class IDCLoadPlugin:
         horizon = options.sced_horizon
         values = self._ensure_time_series(load_dict, horizon)
 
+        if horizon > self.bidder.real_time_horizon:
+            raise ValueError(
+                f"SCED horizon ({horizon}) cannot be greater than "
+                f"real-time bidding horizon ({self.bidder.real_time_horizon})."
+            )
+
         # Real-time bids are keyed by global hour, but SCED consumes a local
         # 0..horizon-1 series for the current solve.
         for k in range(horizon):
             values[k] = bids[hour + k][load_name]["p_load"]
+
 
 
     def bid_into_DAM(self, options, simulator, ruc_instance, ruc_date, ruc_hour):

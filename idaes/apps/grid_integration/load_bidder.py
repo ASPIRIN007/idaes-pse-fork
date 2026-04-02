@@ -28,9 +28,11 @@ class LoadBidder:
         self.solver = solver
         self.forecaster = forecaster
 
+        self._check_inputs()
+
+
         self.day_ahead_model = self.formulate_DA_bidding_problem()
         self.real_time_model = self.formulate_RT_bidding_problem()
-        self._check_inputs()
         self.bids_result_list = []
 
         self.load = self.bidding_model_object.model_data.load_name
@@ -154,9 +156,17 @@ class LoadBidder:
 
         da_prices = self._get_day_ahead_energy_price(date=date, hour=hour)
         da_price_series = self._select_price_series(da_prices)
+        self.update_day_ahead_model(
+            initial_backlog=self.current_backlog, 
+            workload_arrival=self._get_day_ahead_workload_arrival()
+            )
         self._pass_energy_price(self.day_ahead_model, da_price_series)
-        self.solver.solve(self.day_ahead_model, tee=False)
-
+        results = self.solver.solve(self.day_ahead_model, tee=False)
+        # to check whether the solver found an optimal solution. If not, we raise an error since we don't want to submit non-optimal bids into the market.
+        if results.solver.termination_condition != pyo.TerminationCondition.optimal:
+            raise RuntimeError(
+                f"DA bidding optimization did not solve to optimality: {results.solver.termination_condition}"
+            )
         # Convert the solved IDC demand schedule into the nested bid structure
         # that the Prescient plugin writes back into the load dictionary.
         bids = self._assemble_bids(
@@ -180,6 +190,9 @@ class LoadBidder:
         )
 
         return bids
+
+    def _get_day_ahead_workload_arrival(self, hour=0):
+        return self.bidding_model_object.model_data.workload_arrival
 
     def _get_real_time_workload_arrival(self, hour):
         full_profile = self.bidding_model_object.model_data.workload_arrival
@@ -287,7 +300,12 @@ class LoadBidder:
         rt_price_series = self._select_price_series(rt_prices)
         self._pass_energy_price(self.real_time_model, rt_price_series)
 
-        self.solver.solve(self.real_time_model, tee=False)
+        results=self.solver.solve(self.real_time_model, tee=False)
+        # to check whether the solver found an optimal solution. If not, we raise an error since we don't want to submit non-optimal bids into the market.
+        if results.solver.termination_condition != pyo.TerminationCondition.optimal:
+            raise RuntimeError(
+                f"RT bidding optimization did not solve to optimality: {results.solver.termination_condition}"
+            )
 
         bids = self._assemble_bids(
             model=self.real_time_model,
@@ -361,6 +379,14 @@ class LoadBidder:
             df_list.append(pd.DataFrame([result_dict]))
 
         self.bids_result_list.append(pd.concat(df_list, ignore_index=True))
+
+    def update_backlog_from_actual_dispatch(self, hour, actual_dispatch):
+        """
+        Correct current_backlog using the actual load dispatched by Prescient
+        after SCED, rather than relying solely on the optimization model's backlog.
+        """
+        workload = float(self.bidding_model_object.model_data.workload_arrival[hour])
+        self.current_backlog = max(0.0, self.current_backlog + workload - actual_dispatch)
 
     def _pass_energy_price(self, model, energy_price):
         """
